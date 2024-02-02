@@ -1,0 +1,8 @@
+Target_region	primer_f_name	primer_f_seq	primer_r_name	primer_r_seq	reference
+ITS1	ITS1-F_KYO2	TAGAGGAAGTAAAAGTCGTAA	ITS2_KYO2	CTHGGTCATTTAGAGGAASTAA	"Toju, H., Tanabe, A.S., Yamamoto, S., Sato, H., 2012. High-Coverage ITS Primers for the DNA-Based Identification of Ascomycetes and Basidiomycetes in Environmental Samples. PLoS ONE 7, e40863. https://doi.org/10.1371/journal.pone.0040863"
+ITS1	ITS1FI2	GAACCWGCGGARGGATCA	5.8S	CGCTGCGTTCTTCATCG	
+ITS1	BITS	CTACCTGCGGARGGATCA	B58S3	GAGATCCRTTGYTRAAAGTT	
+ITS1	ITS1	TCCGTAGGTGAACCTGCGG	ITS4	TCCTCCGCTTATTGATATGC	
+ITS2	ITS3F	GCATCGATGAAGAACGCAGC	ITS4R	TCCTCCGCTTATTGATATGC	"White TJ, Bruns TD, Lee SB, Taylor JW (1990) Amplification and direct sequencing of fungal ribosomal RNA genes for phylogenetics. In: Innis MA,Gelfand DH, Sninsky JJ, White TJ, editors. PCR protocols: a guide to methodsand applications. United States: Academic Press. pp. 315Ð322"
+ITS2	ITS86F	GTGAATCATCGAATCTTTGAA	ITS4	TCCTCCGCTTATTGATATGC	
+ITS1 5.8S and ITS2	ITS1	TCCGTAGGTGAACCTGCGG	ITS4	TCCTCCGCTTATTGATATGC	
