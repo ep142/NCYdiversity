@@ -1,9 +1,9 @@
-# DADA2/Bioconductor pipeline for ITS, modified, v7.2.5, 2/1/24
+# DADA2/Bioconductor pipeline for ITS, modified, v7.3, 5/1/24
 
 #  Description & instructions ---------------------------------------------
 
-# This script is designed to process reasonably large studies using the
-# DADA2 pipeline https://benjjneb.github.io/dada2/tutorial.html
+# This script is designed to process small studies (<60-80 samples, depending on 
+# RAM) using the DADA2 pipeline https://benjjneb.github.io/dada2/tutorial.html
 # with modifications for ITS analysis https://benjjneb.github.io/dada2/ITS_workflow.html
 # and to carry out further processing needed to ready the output for import
 # into FoodMicrobionet (https://github.com/ep142/FoodMicrobionet)
@@ -12,14 +12,18 @@
 # SRA and data obtained from Novogene UK Ltd. There are also options for
 # single end/paired end data sets obtained with Illumina or 454 or Ion Torrent
 # In addition it includes a workaround for Illumina Novaseq sequences described here:
-# https://github.com/benjjneb/dada2/issues/791
-# in this version UNITE general release for fungi is used as a taxonomic reference data base
+# https://github.com/benjjneb/dada2/issues/791 and a workaround for  handling
+# ITS sequences which do not merge properly due to excess length described here:
+# https://github.com/benjjneb/dada2/issues/537
+# in this version UNITE general release for fungi is used as a taxonomic reference
 # Finally, the script assembles an object which can be used in the future for
 # redoing the taxonomic assignment in an automated way
 
 # to use this script
 
-# 1. copy the script to a new folder and create a RStudio project
+# 1. copy the script to a new folder and create a RStudio project; the directory 
+#    containing the project folder must also contain the bioconductor_pip_ITS_functions.R
+#    file and the primer_pairs_fungi.txt file (see below)
 # 2. create a new folder called data
 # 3. if you are using data downloaded from NCBI SRA
 #    3.1 inside the folder data create three folders: fastq, filtered, metadata
@@ -33,11 +37,13 @@
 #    4.3 put the metadata in the metadata folder; the first column must match 
 #        sample names (as received from Novogene, these are also the names of 
 #        the folders containing the sequences)
-# 5. download the most recent taxonomy reference files from https://benjjneb.github.io/dada2/training.html
+# 5. download the most recent taxonomy reference files from 
+#    https://benjjneb.github.io/dada2/training.html
 #    and put them in a folder called taxdb at the same level of the directory containing your project
-# 6. an optional table with commonly used primer pairs can be downloaded from our repository
-#    primer_pairs_fungi.txt and is used by a function to check primers; it should be placed
-#    in the folder containing the folder of your project and the taxonomic reference folder
+# 6. an optional table with commonly used primer pairs (primer_pairs_fungi.txt) 
+#    can be downloaded from our repository and is used by a function to 
+#    check primers; it should be placed in the folder containing the folder of 
+#.   your project and the taxonomic reference folder.
 # 7. make sure you have all the information you need (primers, platform, region, etc.)
 
 # If you want to use cutadapt to remove primers install it using miniconda
@@ -48,7 +54,8 @@
 
 # Install/load packages ---------------------------------------------------
 
-.cran_packages <- c("tidyverse", "parallel", "beepr", "tictoc", "reticulate")
+.cran_packages <- c("tidyverse", "parallel", "beepr", "tictoc", "reticulate", 
+                    "logr")
 .bioc_packages <- c("BiocManager","dada2", "phyloseq", "DECIPHER", "phangorn", 
                     "BiocStyle", "ShortRead")
 
@@ -78,7 +85,6 @@ r_version <- R.Version() # in the future may be check that the version running i
 # with the script (it only matters if somebody other than myself is using the script)
 session_info <- sessionInfo()
 
-
 # other setup operations ------------------------------------------------
 
 opar <- par(no.readonly=TRUE) 
@@ -86,15 +92,21 @@ par(ask=F)
 # set.seed(1234) 
 # plays audio notifications if TRUE
 play_audio <- T
+sound_n = 6 # an integer from 1 to 11, sets the notification sound
 # keeps record of duration of important steps if TRUE
 keep_time <- T
-sound_n = 6 # an integer from 1 to 11, sets the notification sound
 # verbose output: will print additional objects and messages if TRUE
 verbose_output <- T
+# do you want to use a log to store the options you used in processing?
+# the default is T with verbose_output <- T otherwise you have to set it
+# manually
+use_logr <- ifelse(verbose_output, T, F)
+# use_logr <-T use this line to change it manually
 
 if(play_audio) beep(sound = sound_n) # the notification you will hear
 
-# standard options: you have to change this manually if you want to do otherwise
+# standard options for handling primers: you have to change this manually 
+# if you want to do otherwise
 check_primers <- "auto" # "visually" if you want to do visually, "auto" otherwise
 use_cutadapt <- T # use cutadapt to remove primers, takes time and space, use wisely
 use_primer_table <- T # uses a primer table to check if the primer sequences are OK
@@ -105,42 +117,18 @@ if(use_primer_table){
 
 # functions ---------------------------------------------------------------
 
-# this function is only defined if you use a primer table
-if(use_primer_table){
-  double_check_primers <- function(primer_file = primer_table_path, 
-                                   primerf_name, primerf_seq, primerr_name, primerr_seq){
-    # is the primer file there?
-    if(!file.exists(primer_table_path)) stop("Your primer table is now where you told me...")
-    primer_table <- read_tsv(primer_table_path)
-    # check the forward name
-    primerf_n <- pull(primer_table, primer_f_name)
-    primerr_n <- pull(primer_table, primer_r_name)
-    if(!primerf_name %in% primerf_n) warning("the name of your forward primer is not in the table you provided")
-    if(!primerr_name %in% primerr_n) warning("the name of your forward primer is not in the table you provided")
-    if(primerf_name %in% primerf_n & primerr_name %in% primerr_n){
-      primer_line_df <- dplyr::filter(primer_table, primer_f_seq == primer_f_seq & primer_r_seq == primerr_seq)
-      if(nrow(primer_line_df) == 0) warning(" I cannot locate your primer pair, check your primers or  primer table (names, sequences)...")
-    }
-  }
-}
-
-# create different orientations of the primers
-allOrients <- function(primer) {
-  # Create all orientations of the input sequence
-  require(Biostrings)
-  dna <- DNAString(primer)  # The Biostrings works w/ DNAString objects rather than character vectors
-  orients <- c(Forward = dna, Complement = Biostrings::complement(dna), Reverse = Biostrings::reverse(dna),
-               RevComp = Biostrings::reverseComplement(dna))
-  return(sapply(orients, toString))  # Convert back to character vector
-}
+# this will load three functions which are going to be used in the pipeline
+# this file should be in the folder containing your project directory
+# otherwise you need to change the path
+source(file.path("..","bioconductor_pip_ITS_functions.R"))
 
 # study metadata ----------------------------------------------------------
 
 # change this as appropriate
 data_type <- "sra" 
-# alternatives are sra, for data downloaded from sra
-# novogene_raw, for data obtained from novogene, with primer not removed
-# novogene_clean, for data obtained from novogene, data with primer removed
+# alternatives are "sra", for data downloaded from sra
+# "novogene_raw", for data obtained from novogene, with primer not removed
+# "novogene_clean", for data obtained from novogene, data with primer removed
 
 # creating information for the study and sample data frames
 # when using data other than those downloaded from SRA replace
@@ -158,7 +146,6 @@ platform <- "Illumina" # (or set to "Illumina", "Illumina_novaseq", or "Ion_Torr
 # for this specific study Illumina Novaseq 250bpx2
 paired_end <- T # set to true for paired end, false for single end or in the case of clean, merged seqs
 if (!paired_end) overlapping <- T # needed to run species assignment for SILVA
-
 
 # Primers --------------------------------------------
 # all in standard 5'-3' orientation
@@ -202,7 +189,6 @@ if(use_primer_table) double_check_primers(
 
 (FWD.orients <- allOrients(FWD))
 (REV.orients <- allOrients(REV))
-
 
 # create sub-directory ----------------------------------------------------------
 # sub-directory data must already be in the wd
@@ -324,6 +310,13 @@ if(all(sample.names %in% samdf$Run)){
 
 # sequences will sampled and shown here as a double check
 
+# check carefully if primer occur in the right position: 
+# the forward primer  should appear at the beginning of forward sequences 
+# the reverse primer should occur at the beginning of reverse sequences (if any)
+# extra nt may occasionally be present
+# if you have chosen to check primer visually take note now of their occurrence 
+# and the length of the forward and reverse sequence to trim at the 5' end
+
 if(keep_time) tic("\nReading sequences")
 # check for occurrence of primers and adapters on a sample of forward and
 # reverse sequences
@@ -349,16 +342,8 @@ if(paired_end){
   ave_seq_length <- mean(c(ave_seq_length_f, ave_seq_length_r))
 }
 
-# check carefully if primer occur in the right position: 
-# the forward primer  should appear at the beginning of forward sequences 
-# the reverse primer should occur at the beginning of reverse sequences (if any)
-# extra nt may occasionally be present
-# if you have chosen to check primer visually take note now of their occurrence 
-# and the length of the forward and reverse sequence to trim at the 5' end
-
 if(play_audio) beep(sound = sound_n)
 if(keep_time) toc()
-
 
 #  check primers automatically --------------------------------------------
 
@@ -405,11 +390,10 @@ if(check_primers == "auto") {
   # end of forward sequences
 }  
 
-
 #  use cutadapt -----------------------------------------------------------
 cat("\n", "the use_cutadapt flag is set to ", use_cutadapt) 
+cat("\n", "if you want to change the use_cutadapt do it below")
 beep()
-cat("if you want to change the use_cutadapt do it below")
 
 # use_cutadapt <- !use_cutadapt
 
@@ -700,7 +684,7 @@ if(str_detect(platform,"novaseq")){
 if(play_audio) beep(sound = sound_n)
 if(keep_time) toc()
 
-# dereplicate, infer, merge -------------------------------------------------------------
+# dereplicate, infer ASV -------------------------------------------------------------
 
 if(keep_time) tic("\ndereplicating, inferring ASVs, merging")
 
@@ -732,35 +716,50 @@ save.image(file = str_c(Study,".Rdata"))
 if(keep_time) toc()
 if(play_audio) beep(sound = sound_n)
 
-# merge sequences
+
+# merge sequences ---------------------------------------------------------
 
 # If paired end, when possible merge together the inferred forward and reverse sequences.
 # with a good overlap (30 bp)
 # set verbose = F if you want less output
 
-if(paired_end){
-  if(keep_time) tic("\nmerging paired ends")
-  minO = 25 # should be 20-30
-  maxM = 0 # should be 0
-  overlapping <- F # set this to true if you think there is good overlap
-  # when  fwd and rev are not able to cover the full amplicon length
-  # with a given overlap
-  # justConcatenate = T adds 10 N between fwd and rev
-  if (overlapping){
-    mergers <- mergePairs(dadaFs, derepFs, dadaRs, derepRs, 
-                          maxMismatch = maxM,
-                          minOverlap = minO,
-                          verbose=TRUE)
-  } else {
+# merge options
+overlapping <- T # if F concatenation will be always performed
+# use overlapping <- F if you loose all or most sequences after merging
+minO = 25 # minimum overlap should be 20-30
+maxM = 0 # maximum mismatch should be 0
+# merge_option
+# "fwd" will only use forward sequences (it is actually the same as operating on 
+# non-paired end sequences
+# "merge" will attemt a merge on all sequences
+# "mixed" will try to merge all sequence it can and concatenate the others
+# with this option no tree is returned
+# minO and maxM are the minimum overlap and max mismatch
+merge_option <- "mixed"
+
+if(!paired_end | merge_option == "fwd"){
+  mergers <- dadaFs
+} else {
+  if(keep_time) tic("\nmerging or concatenating paired ends")
+  if (!overlapping){
+    # when  fwd and rev are not able to cover the full amplicon length
+    # with a given overlap justConcatenate = T adds 10 N between fwd and rev
     mergers <- mergePairs(dadaFs, derepFs, dadaRs, derepRs,
                           justConcatenate = T,
                           verbose=TRUE)
+  } else {
+    if(merge_option == "merge"){
+      # does merging, can result in loss of longer sequences for ITS
+      mergers <- mergePairs(dadaFs, derepFs, dadaRs, derepRs, 
+                            maxMismatch = maxM,
+                            minOverlap = minO,
+                            verbose = TRUE)
+    
+      } else {
+      mergers <- mixed_merge()
+      }
+    if(keep_time) toc()
   }
-  
-  if(keep_time) toc()
-  
-} else {
-  mergers <- dadaFs
 }
 
 if(play_audio) beep(sound = sound_n)
@@ -841,7 +840,6 @@ data.frame(nseqs = colSums(seqtab.nochim)) |>
     y = "number of individual sequences"
   )
 
-
 # which ASVs are singletons or doubletons?
 single_double <- which(colSums(seqtab.nochim)<=2)
 length(single_double)/ncol(seqtab.nochim)
@@ -921,7 +919,6 @@ if(keep_time) tic("\nassign taxonomy")
 
 taxdb_dir <- file.path("..","tax_db") # change this if the tax databases are elsewhere
 list.files(taxdb_dir)
-
 
 # assignment with UNITE
 RC <- T # true by default
@@ -1027,8 +1024,10 @@ if(filter_ASVs){
 # but it is already prohibitive with 20k
 # and usually not worth the effort
 
-dotree <- T # avoid if overlapping == F
-if(dim(seqtab.nochim)[2]>10000 | overlapping == F) {dotree <- F}
+dotree <- F # avoid if overlapping == F
+if(dim(seqtab.nochim)[2]>10000 | overlapping == F | merge_option == "mixed") {
+  dotree <- F
+  }
 
 if (dotree) {
   if(keep_time) tic("\nbuilding the phylogenetic tree")
@@ -1039,7 +1038,6 @@ if (dotree) {
     DECIPHER::AlignSeqs(DNAStringSet(seqs),
                         anchor = NA,
                         processors = nc)
-  
   # The phangorn R package is then used to construct a phylogenetic tree.
   # Here we first construct a neighbor-joining tree, and then fit a GTR+G+I
   # (Generalized time-reversible with Gamma rate variation)
@@ -1339,6 +1337,49 @@ if(all(check_list)){
 
 # save the workspace
 save.image(file = str_c(Study,"_small.Rdata"))
+
+
+#  save the log -----------------------------------------------------------
+# need to put it at the end of the script because if the script is used
+# on several days, yout ned to reinitialize the log
+if(use_logr){
+  log_path <- file.path(str_c(Study,"log", sep = "_"))
+  log_open(log_path)
+  gen_options <- list(
+    audio = play_audio,
+    sound = sound_n,
+    timing = keep_time,
+    verbose = verbose_output
+  )
+  log_print(gen_options, console = F)
+  study_options <- list(
+    study = Study,
+    target_region <- str_c(target, region, sep = ", "),
+    doi = DOI,
+    Platform = platform
+  )
+  log_print(study_options, console = F)
+  primers <- list(primerf = primer_f,
+                  primerr = primer_r,
+                  primerfseq = FWD.orients,
+                  primerrseq = REV.orients)
+  log_print(primers, console = F)
+  handling_primers <- list(
+    checkprimers <- check_primers,
+    usecutatpt <- use_cutadapt
+  )
+  log_print(handling_primers, console = F)
+  log_print(filter_and_trim_par, console = F)
+  merge_opt <- list(
+    pent = paired_end,
+    ovl = overlapping,
+    mrgopt = merge_option,
+    max_mismatch = maxM,
+    min_ovlap = minO
+  )
+  dotree
+  log_close()
+}
 
 
 # Package citations -------------------------------------------------------
