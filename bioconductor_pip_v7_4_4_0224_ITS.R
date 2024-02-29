@@ -1,4 +1,4 @@
-# DADA2/Bioconductor pipeline for ITS, modified, v7.4, 13/2/24
+# DADA2/Bioconductor pipeline for ITS, modified, v7.4.4, 27/2/24
 
 #  Description & instructions ---------------------------------------------
 
@@ -111,6 +111,7 @@ check_primers <- "auto" # "visually" if you want to do visually, "auto" otherwis
 use_cutadapt <- T # use cutadapt to remove primers, takes time and space, use wisely
 use_primer_table <- T # uses a primer table to check if the primer sequences are OK
 # put the location of your primer table inside this if
+# hint: if the file is two levels up just duplicate ".." below
 if(use_primer_table){
   primer_table_path <- file.path("..", "primer_pairs_fungi.txt")
 }
@@ -120,6 +121,7 @@ if(use_primer_table){
 # this will load three functions which are going to be used in the pipeline
 # this file should be in the folder containing your project directory
 # otherwise you need to change the path
+# hint: if the source files is two levels up just duplicate ".." below
 source(file.path("..","bioconductor_pip_ITS_functions.R"))
 
 # study metadata ----------------------------------------------------------
@@ -134,11 +136,11 @@ data_type <- "sra"
 # when using data other than those downloaded from SRA replace
 # the accession number with whichever identifier you want to use
 
-Study <- "SRP216574" # PRJNA556980 also includes bacteria
-target <- "ITS region"
-region <- "ITS1"
+Study <- "SRP382334" # PRJNA849518
+target <- "ITS region" # or ITS region and 16S RNA gene (or 16S RNA)
+region <- "ITS1" # or ITSx and Vx
 seq_accn <- Study
-DOI <- "10.1016/j.micres.2020.1265936"
+DOI <- "10.3389/fmicb.2022.919047"
 
 # information on the platform and arrangement
 
@@ -151,10 +153,11 @@ if (!paired_end) overlapping <- T # needed to run species assignment for SILVA
 # all in standard 5'-3' orientation
 # ITS1:
 # ITS1-F_KYO2 (18S SSU 1733–1753) TAGAGGAAGTAAAAGTCGTAA 21 bp and ITS2_KYO2 (5.8 2046–2029) CTHGGTCATTTAGAGGAASTAA 22 bp
-# Toju, H., Tanabe, A.S., Yamamoto, S., Sato, H., 2012. High-Coverage ITS Primers for the DNA-Based Identification of Ascomycetes and Basidiomycetes in Environmental Samples. PLoS ONE 7, e40863. https://doi.org/10.1371/journal.pone.0040863
+# (Toju et al., 2012)
 # ITS1FI2 GAACCWGCGGARGGATCA (18 bp) and 5.8S CGCTGCGTTCTTCATCG (17 bp)
-# BITS CTACCTGCGGARGGATCA (26 bp) and B58S3 GAGATCCRTTGYTRAAAGTT (20 bp)
+# BITS CTACCTGCGGARGGATCA (18 bp) and B58S3 GAGATCCRTTGYTRAAAGTT (20 bp)  (Bokulich and Mills, 2013)
 # ITS1 TCCGTAGGTGAACCTGCGG (19 bp) and ITS4 TCCGTAGGTGAACCTGCGG (19 bp)
+# ITS5F GGAAGTAAAAGTCGTAACAAGG (22 bp)	ITS1R	GCTGCGTTCTTCATCGATGC (20 bp)
 
 # ITS2: 
 # ITS3F GCATCGATGAAGAACGCAGC ITS4R TCCTCCGCTTATTGATATGC 
@@ -166,14 +169,14 @@ if (!paired_end) overlapping <- T # needed to run species assignment for SILVA
 # ITS1 TCCGTAGGTGAACCTGCGG (19 bp) and ITS4 TCCTCCGCTTATTGATATGC (20 bp)
 
 # expected amplicon length is variable
-primer_f <- "ITS1" # 19 bp
-primer_r <- "ITS4"  # 20 bp
+primer_f <- "ITS5F" # 22 bp
+primer_r <- "ITS1R"  # 20 bp
 
 # NOTE: be extra careful in indicating primer sequences because this will affect
 # primer detection and primer removal by cutadapt
 
-FWD <- "TCCGTAGGTGAACCTGCGG"  ## CHANGE THIS to your forward primer sequence
-REV <- "TCCTCCGCTTATTGATATGC" ## CHANGE THIS to your reverse primer sequence
+FWD <- "GGAAGTAAAAGTCGTAACAAGG"  ## CHANGE THIS to your forward primer sequence
+REV <- "GCTGCGTTCTTCATCGATGC" ## CHANGE THIS to your reverse primer sequence
 
 target1 <- "ITS_DNA"
 target2 <- region
@@ -257,8 +260,8 @@ if(data_type == "novogene_raw"){
 # early check for sequences and metadata --------------------------------
 
 # path to the metadata file (needs to be adapted)
-metadata_path <- file.path("data", "metadata", "SraRunInfo.csv") 
-# alternatives when using data downloades from NCBI SRA are:
+metadata_path <- file.path("data", "metadata", "SraRunTable.txt") 
+# alternatives when using data downloads from NCBI SRA are:
 # "data/metadata/SraRunInfo.txt" 
 # "data/metadata/SraRunTable.txt.csv"
 # "data/metadata/SraRunTable.txt"
@@ -538,6 +541,7 @@ save.image(file = str_c(Study,".Rdata"))
 if(keep_time) toc()
 if(play_audio) beep(sound = sound_n)
 
+# looks more like Novaseq than miseq
 
 # filtering and trimming --------------------------------------------------
 
@@ -563,7 +567,7 @@ truncr<- NULL # NULL if not paired end and ITS
 trim_left = 0 # use a length 2 vector c(x,y) if paired end or a single number if not
 if(platform == "Ion_Torrent") trim_left <- trim_left+15
 maxEEf = 2 # with very high quality data can be reduced to 1
-maxEEr = 2 # 2 very restrictive, 5 does well in most cases, not needed for single end
+maxEEr = 5 # 2 very restrictive, 5 does well in most cases, not needed for single end
 trunc_q = 2 # with very high quality data can be increased up to 10-11
 min_length <- 50
 max_length <- 999 # not needed for Illumina and Ion Torrent, modify to max. exp. seq. length for F454
@@ -1179,7 +1183,7 @@ write_tsv(study, str_c(Study,"_study.txt"))
 # check naming of the geoloc info
 
 samples <- samples %>%
-  mutate(description = str_c("Pulque production", SampleName, LibraryName, sep =", "))
+  mutate(description = str_c("Flat peach wine", Sample.Name, Tmp, sep =", "))
 samples <- samples %>%
   mutate(Sample_Name = Run) 
 
@@ -1348,7 +1352,7 @@ save.image(file = str_c(Study,"_small.Rdata"))
 
 #  save the log -----------------------------------------------------------
 # need to put it at the end of the script because if the script is used
-# on several days, yout ned to reinitialize the log
+# on several days, yout need to reinitialize the log
 if(use_logr){
   log_path <- file.path(str_c(Study,"log", sep = "_"))
   log_open(log_path)
@@ -1378,7 +1382,7 @@ if(use_logr){
   log_print(handling_primers, console = F)
   log_print(filter_and_trim_par, console = F)
   merge_opt <- list(
-    pent = paired_end,
+    pend = paired_end,
     ovl = overlapping,
     mrgopt = merge_option,
     max_mismatch = maxM,
@@ -1402,7 +1406,7 @@ map(c(.cran_packages, .bioc_packages), citation)
 
 # Assume that this is overall under MIT licence
 
-# Copyright 2021, 2022, 2023, 2024 Eugenio Parente
+# Copyright 2024 Eugenio Parente
 # Permission is hereby granted, free of charge, to any person obtaining 
 # a copy of this software and associated documentation files (the "Software"), 
 # to deal in the Software without restriction, including without limitation 

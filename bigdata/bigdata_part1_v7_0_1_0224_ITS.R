@@ -2,7 +2,7 @@
 # DADA2/Bioconductor pipeline for big data, modified
 # part 2, create sequence tables
 #
-# bigdata_part1_v7_0224_ITS
+# bigdata_part1_v7_0_1_0224_ITS
 ################################################################################
 
 # This script is designed to process large studies using the
@@ -925,7 +925,7 @@ if(use_logr){
   log_print(handling_primers, console = F)
   log_print(filter_and_trim_par, console = F)
   merge_opt <- list(
-    pent = paired_end,
+    pend = paired_end,
     ovl = overlapping,
     mrgopt = merge_option,
     max_mismatch = maxM,

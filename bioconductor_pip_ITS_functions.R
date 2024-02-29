@@ -1,6 +1,6 @@
 # Bioconductor pipeline for ITS: functions --------------------------------
 
-# v1.2 13/2/2024
+# v1.2.2 21/2/2024
 
 # three functions needed in the pipeline 
 # the 16S pipeline only needs the first 2
@@ -16,8 +16,34 @@ if(use_primer_table){
     # check the forward name
     primerf_n <- pull(primer_table, primer_f_name)
     primerr_n <- pull(primer_table, primer_r_name)
-    if(!primerf_name %in% primerf_n) warning("the name of your forward primer is not in the table you provided")
-    if(!primerr_name %in% primerr_n) warning("the name of your forward primer is not in the table you provided")
+    if(!primerf_name %in% primerf_n) {
+      warning("the name of your forward primer is not in the table you provided")
+    } else {
+        cat("\nThe name of your forward primer is in the table you provided\n")
+        # check the sequence
+        fprimer_from_table <- primer_table |>
+          dplyr::filter(primer_f_name == primerf_name) |>
+          pull(primer_f_seq)
+        if(fprimer_from_table == primerf_seq){
+          cat("\nThe sequence of your forward primer matches the forward primer name\n")
+        } else {
+          warning("the sequence of your forward primer does not match with the table")
+        }
+      }
+    if(!primerr_name %in% primerr_n) {
+      warning("the name of your forward primer is not in the table you provided")
+    } else {
+      cat("\nThe name of your reverse primer is in the table you provided\n")
+      # check the sequence
+      rprimer_from_table <- primer_table |>
+        dplyr::filter(primer_r_name == primerr_name) |>
+        pull(primer_r_seq)
+      if(rprimer_from_table == primerr_seq){
+        cat("\nThe sequence of your reverse primer matches the reverse primer name\n")
+      } else {
+        warning("the sequence of your reverse primer does not match with the table")
+      }
+    }
     if(primerf_name %in% primerf_n & primerr_name %in% primerr_n){
       primer_line_df <- dplyr::filter(primer_table, primer_f_seq == primer_f_seq & primer_r_seq == primerr_seq)
       if(nrow(primer_line_df) == 0) warning(" I cannot locate your primer pair, check your primers or  primer table (names, sequences)...")
