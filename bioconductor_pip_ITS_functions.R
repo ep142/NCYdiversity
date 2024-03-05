@@ -1,6 +1,6 @@
 # Bioconductor pipeline for ITS: functions --------------------------------
 
-# v1.2.2 21/2/2024
+# v1.2.3 5/3/2024
 
 # three functions needed in the pipeline 
 # the 16S pipeline only needs the first 2
@@ -11,11 +11,11 @@ if(use_primer_table){
   double_check_primers <- function(primer_file = primer_table_path, 
                                    primerf_name, primerf_seq, primerr_name, primerr_seq){
     # is the primer file there?
-    if(!file.exists(primer_table_path)) stop("Your primer table is now where you told me...")
+    if(!file.exists(primer_table_path)) stop("Your primer table is not where you told me...")
     primer_table <- read_tsv(primer_table_path)
     # check the forward name
-    primerf_n <- pull(primer_table, primer_f_name)
-    primerr_n <- pull(primer_table, primer_r_name)
+    primerf_n <- unique(pull(primer_table, primer_f_name))
+    primerr_n <- unique(pull(primer_table, primer_r_name))
     if(!primerf_name %in% primerf_n) {
       warning("the name of your forward primer is not in the table you provided")
     } else {
@@ -23,7 +23,8 @@ if(use_primer_table){
         # check the sequence
         fprimer_from_table <- primer_table |>
           dplyr::filter(primer_f_name == primerf_name) |>
-          pull(primer_f_seq)
+          pull(primer_f_seq) |>
+          unique()
         if(fprimer_from_table == primerf_seq){
           cat("\nThe sequence of your forward primer matches the forward primer name\n")
         } else {
@@ -37,7 +38,8 @@ if(use_primer_table){
       # check the sequence
       rprimer_from_table <- primer_table |>
         dplyr::filter(primer_r_name == primerr_name) |>
-        pull(primer_r_seq)
+        pull(primer_r_seq) |>
+        unique()
       if(rprimer_from_table == primerr_seq){
         cat("\nThe sequence of your reverse primer matches the reverse primer name\n")
       } else {

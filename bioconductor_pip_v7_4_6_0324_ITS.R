@@ -1,4 +1,4 @@
-# DADA2/Bioconductor pipeline for ITS, modified, v7.4.4, 27/2/24
+# DADA2/Bioconductor pipeline for ITS, modified, v7.4.6, 05/03/24
 
 #  Description & instructions ---------------------------------------------
 
@@ -11,7 +11,7 @@
 # This version of the script includes options for both data downloaded from NCBI
 # SRA and data obtained from Novogene UK Ltd. There are also options for
 # single end/paired end data sets obtained with Illumina or 454 or Ion Torrent
-# In addition it includes a workaround for Illumina Novaseq sequences described here:
+# In addition it includes a workaround for binned quality fastq described here:
 # https://github.com/benjjneb/dada2/issues/791 and a workaround for  handling
 # ITS sequences which do not merge properly due to excess length described here:
 # https://github.com/benjjneb/dada2/issues/537
@@ -136,16 +136,16 @@ data_type <- "sra"
 # when using data other than those downloaded from SRA replace
 # the accession number with whichever identifier you want to use
 
-Study <- "SRP382334" # PRJNA849518
-target <- "ITS region" # or ITS region and 16S RNA gene (or 16S RNA)
-region <- "ITS1" # or ITSx and Vx
+Study <- "SRP249902" # PRJNA606779
+target <- "ITS region and 16S RNA gene" # or ITS region and 16S RNA gene (or 16S RNA)
+region <- "ITS1 and V3-V4" # or ITSx and Vx
 seq_accn <- Study
-DOI <- "10.3389/fmicb.2022.919047"
+DOI <- "10.3389/fmicb.2022.954917"
 
 # information on the platform and arrangement
 
-platform <- "Illumina" # (or set to "Illumina", "Illumina_novaseq", or "Ion_Torrent" or "F454")
-# for this specific study Illumina Novaseq 250bpx2
+platform <- "Illumina_HiSeq" # (or set to "Illumina", "Illumina_novaseq", "Illumina_HiSeq" or "Ion_Torrent" or "F454")
+# 
 paired_end <- T # set to true for paired end, false for single end or in the case of clean, merged seqs
 if (!paired_end) overlapping <- T # needed to run species assignment for SILVA
 
@@ -158,6 +158,8 @@ if (!paired_end) overlapping <- T # needed to run species assignment for SILVA
 # BITS CTACCTGCGGARGGATCA (18 bp) and B58S3 GAGATCCRTTGYTRAAAGTT (20 bp)  (Bokulich and Mills, 2013)
 # ITS1 TCCGTAGGTGAACCTGCGG (19 bp) and ITS4 TCCGTAGGTGAACCTGCGG (19 bp)
 # ITS5F GGAAGTAAAAGTCGTAACAAGG (22 bp)	ITS1R	GCTGCGTTCTTCATCGATGC (20 bp)
+# ITS1F TTGGTCATTTAGAGGAAGTAA (21 bp) ITS2 GCTGCGTTCTTCATCGATGC (20 bp)
+# ITS1Fv2 CTTGGTCATTTAGAGGAAGTAA (22 bp) ITS1R GCTGCGTTCTTCATCGATGC (20 bp)
 
 # ITS2: 
 # ITS3F GCATCGATGAAGAACGCAGC ITS4R TCCTCCGCTTATTGATATGC 
@@ -169,13 +171,13 @@ if (!paired_end) overlapping <- T # needed to run species assignment for SILVA
 # ITS1 TCCGTAGGTGAACCTGCGG (19 bp) and ITS4 TCCTCCGCTTATTGATATGC (20 bp)
 
 # expected amplicon length is variable
-primer_f <- "ITS5F" # 22 bp
+primer_f <- "ITS1Fv2" # 22 bp
 primer_r <- "ITS1R"  # 20 bp
 
 # NOTE: be extra careful in indicating primer sequences because this will affect
 # primer detection and primer removal by cutadapt
 
-FWD <- "GGAAGTAAAAGTCGTAACAAGG"  ## CHANGE THIS to your forward primer sequence
+FWD <- "CTTGGTCATTTAGAGGAAGTAA"  ## CHANGE THIS to your forward primer sequence
 REV <- "GCTGCGTTCTTCATCGATGC" ## CHANGE THIS to your reverse primer sequence
 
 target1 <- "ITS_DNA"
@@ -491,6 +493,7 @@ if(use_cutadapt){
 if(keep_time) tic("\ncreate quality profile plots")
 
 # adapt this if you want to pick specific runs
+# you should be able to determine from quality prots if the quality scores are binned
 
 plot_x_limit <- round(ave_seq_length/50)*50+25
 toplot_fwd <- sampleFs
@@ -541,7 +544,6 @@ save.image(file = str_c(Study,".Rdata"))
 if(keep_time) toc()
 if(play_audio) beep(sound = sound_n)
 
-# looks more like Novaseq than miseq
 
 # filtering and trimming --------------------------------------------------
 
@@ -655,8 +657,16 @@ if(keep_time) tic("\nlearning error rates")
 # as a default uses the first 1M sequences; if you want more nbases = xx
 # another option could be randomize = T, to randomly pick samples for error
 # estimates
-# this may take VERY LONG, especially for novaseq
-if(str_detect(platform, "novaseq")){
+# this may take VERY LONG, especially for quality binned data
+
+qual_binned <- if_else(
+  str_detect(platform, "miseq") | str_detect(platform, "Ion_Torrent") | str_detect(platform, "F454"),
+  F, T)
+
+# or else set manually
+# qual_binned <- F
+
+if(qual_binned){
   errF <- learnErrors(filtFs, nbases=1e8, multithread=TRUE, randomize = F)
   if(paired_end) errR <- learnErrors(filtRs, nbases=1e8, multithread=TRUE, randomize = F)
 } else {
@@ -668,7 +678,7 @@ if(str_detect(platform, "novaseq")){
 plotErrors(errF, nominalQ=TRUE) + ggtitle("Fwd")
 if(paired_end) plotErrors(errR, nominalQ=TRUE) + ggtitle("Rev")
 # look at how the black line follows the points, should be monotonic
-if(str_detect(platform,"novaseq")){
+if(qual_binned){
   save(errF, file = str_c(Study,"_errF.Rdata"))
   new_errF_out <- getErrors(errF) %>%
     data.frame() %>%
@@ -727,7 +737,6 @@ save.image(file = str_c(Study,".Rdata"))
 
 if(keep_time) toc()
 if(play_audio) beep(sound = sound_n)
-
 
 # merge sequences ---------------------------------------------------------
 
@@ -924,7 +933,6 @@ save.image(file = str_c(Study,".Rdata"))
 rm(dadaFs, mergers)
 save.image(file = str_c(Study,"_small.Rdata"))
 
-
 # assign taxonomy ---------------------------------------------------------
 
 if(keep_time) tic("\nassign taxonomy")
@@ -1037,7 +1045,7 @@ if(filter_ASVs){
 # but it is already prohibitive with 20k
 # and usually not worth the effort
 
-dotree <- F # avoid if overlapping == F
+dotree <- T # avoid if overlapping == F
 if(dim(seqtab.nochim)[2]>10000 | overlapping == F | merge_option == "mixed") {
   dotree <- F
   }
@@ -1183,16 +1191,16 @@ write_tsv(study, str_c(Study,"_study.txt"))
 # check naming of the geoloc info
 
 samples <- samples %>%
-  mutate(description = str_c("Flat peach wine", Sample.Name, Tmp, sep =", "))
+  mutate(description = str_c(Host, Sample.Name, sep =", "))
 samples <- samples %>%
   mutate(Sample_Name = Run) 
 
 # information of geoloc (and names of the field) is very inconsistent:
 # check the info in your sample metadata and adatp these commands
 # use these if part or all of the geolocation information is missing
-samples$geo_loc_name_country <- NA_character_
-samples$geo_loc_name_country_continent <- NA_character_
-samples$lat_lon <- NA_character_
+# samples$geo_loc_name_country <- "your country here"
+# samples$geo_loc_name_country_continent <- "your continent here"
+# samples$lat_lon <- NA_character_
 
 
 # create label2 (to avoid numbers as first char.; s. can be removed later with
