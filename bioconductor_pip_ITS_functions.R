@@ -25,6 +25,7 @@ if(use_primer_table){
           dplyr::filter(primer_f_name == primerf_name) |>
           pull(primer_f_seq) |>
           unique()
+        if(length(fprimer_from_table)>1) stop("\nYou have more than one sequence associated to the primer name in the primer table.\n")
         if(fprimer_from_table == primerf_seq){
           cat("\nThe sequence of your forward primer matches the forward primer name\n")
         } else {
@@ -40,6 +41,7 @@ if(use_primer_table){
         dplyr::filter(primer_r_name == primerr_name) |>
         pull(primer_r_seq) |>
         unique()
+      if(length(rprimer_from_table)>1) stop("\nYou have more than one sequence associated to the primer name in the primer table.\n")
       if(rprimer_from_table == primerr_seq){
         cat("\nThe sequence of your reverse primer matches the reverse primer name\n")
       } else {

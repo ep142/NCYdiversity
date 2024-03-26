@@ -1,10 +1,12 @@
-# DADA2/Bioconductor pipeline for ITS, modified, v7.4.6, 05/03/24
+# DADA2/Bioconductor pipeline for ITS, modified, v7.4.8, 13/03/24
 
 #  Description & instructions ---------------------------------------------
 
-# This script is designed to process small studies (<60-80 samples, depending on 
-# RAM) using the DADA2 pipeline https://benjjneb.github.io/dada2/tutorial.html
-# with modifications for ITS analysis https://benjjneb.github.io/dada2/ITS_workflow.html
+# This script is designed to process small studies (<60-80 samples, but even 10  
+# can be processed depending on RAM) using the DADA2 pipeline 
+# https://benjjneb.github.io/dada2/tutorial.html
+# with modifications for ITS analysis 
+# https://benjjneb.github.io/dada2/ITS_workflow.html
 # and to carry out further processing needed to ready the output for import
 # into FoodMicrobionet (https://github.com/ep142/FoodMicrobionet)
 
@@ -55,7 +57,7 @@
 # Install/load packages ---------------------------------------------------
 
 .cran_packages <- c("tidyverse", "parallel", "beepr", "tictoc", "reticulate", 
-                    "logr", "R.utils")
+                    "logr", "R.utils", "crayon")
 .bioc_packages <- c("BiocManager","dada2", "phyloseq", "DECIPHER", "phangorn", 
                     "BiocStyle", "ShortRead")
 
@@ -136,15 +138,15 @@ data_type <- "sra"
 # when using data other than those downloaded from SRA replace
 # the accession number with whichever identifier you want to use
 
-Study <- "SRP249902" # PRJNA606779
-target <- "ITS region and 16S RNA gene" # or ITS region and 16S RNA gene (or 16S RNA)
-region <- "ITS1 and V3-V4" # or ITSx and Vx
+Study <- "ERP137138" # PRJEB52423
+target <- "ITS region" # or ITS region and 16S RNA gene (or 16S RNA)
+region <- "ITS1" # or ITSx and Vx
 seq_accn <- Study
-DOI <- "10.3389/fmicb.2022.954917"
+DOI <- "10.1111/mec.16630"
 
 # information on the platform and arrangement
 
-platform <- "Illumina_HiSeq" # (or set to "Illumina", "Illumina_novaseq", "Illumina_HiSeq" or "Ion_Torrent" or "F454")
+platform <- "Illumina_miseq" # (or set to "Illumina_miseq", "Illumina_novaseq", "Illumina_HiSeq", "Illumina_iSeq" or "Ion_Torrent" or "F454")
 # 
 paired_end <- T # set to true for paired end, false for single end or in the case of clean, merged seqs
 if (!paired_end) overlapping <- T # needed to run species assignment for SILVA
@@ -159,20 +161,21 @@ if (!paired_end) overlapping <- T # needed to run species assignment for SILVA
 # ITS1 TCCGTAGGTGAACCTGCGG (19 bp) and ITS4 TCCGTAGGTGAACCTGCGG (19 bp)
 # ITS5F GGAAGTAAAAGTCGTAACAAGG (22 bp)	ITS1R	GCTGCGTTCTTCATCGATGC (20 bp)
 # ITS1F TTGGTCATTTAGAGGAAGTAA (21 bp) ITS2 GCTGCGTTCTTCATCGATGC (20 bp)
-# ITS1Fv2 CTTGGTCATTTAGAGGAAGTAA (22 bp) ITS1R GCTGCGTTCTTCATCGATGC (20 bp)
+# ITS1Fv2 CTTGGTCATTTAGAGGAAGTAA (22 bp) ITS1R GCTGCGTTCTTCATCGATGC (20 bp) (White et al., 1990)
 
 # ITS2: 
 # ITS3F GCATCGATGAAGAACGCAGC ITS4R TCCTCCGCTTATTGATATGC 
 # (White TJ, Bruns TD, Lee SB, Taylor JW (1990) Amplification and direct sequencing of fungal ribosomal RNA genes for phylogenetics. In: Innis MA,Gelfand DH, Sninsky JJ, White TJ, editors. PCR protocols: a guide to methodsand applications. United States: Academic Press. pp. 315–322)
-# ITS86F (GTGAATCATCGAATCTTTGAA) 21 bp and ITS4 (TCCTCCGCTTATTGATATGC) 20 bp
-# ITS3f (GCATCGATGAAGAACGCAGC) 20 bp and ITS4-KYO1 (AHCGATGAAGAACRYAG) 17 bp Toju et al., 2012
+# ITS86F GTGAATCATCGAATCTTTGAA (21 bp) and ITS4 TCCTCCGCTTATTGATATGC (20 bp)
+# ITS3f GCATCGATGAAGAACGCAGC (20 bp) and ITS4-KYO1 AHCGATGAAGAACRYAG (17 bp) Toju et al., 2012
+# F2045 GCATCGATGAAGAACGCAGC (20 bp) and R2390 TCCTCCGCTTATTGATATGC (20 bp)
 
 # ITS1 5.8S and ITS2:
 # ITS1 TCCGTAGGTGAACCTGCGG (19 bp) and ITS4 TCCTCCGCTTATTGATATGC (20 bp)
 
 # expected amplicon length is variable
 primer_f <- "ITS1Fv2" # 22 bp
-primer_r <- "ITS1R"  # 20 bp
+primer_r <- "ITS2"  # 20 bp
 
 # NOTE: be extra careful in indicating primer sequences because this will affect
 # primer detection and primer removal by cutadapt
@@ -400,7 +403,7 @@ if(check_primers == "auto") {
 cat("\n", "the use_cutadapt flag is set to ", use_cutadapt) 
 cat("\n", "if you want to change the use_cutadapt do it below")
 beep()
-
+# no primers except for a few sequences
 # use_cutadapt <- !use_cutadapt
 
 # make sure you set the location of cutadapt correctly
@@ -493,7 +496,7 @@ if(use_cutadapt){
 if(keep_time) tic("\ncreate quality profile plots")
 
 # adapt this if you want to pick specific runs
-# you should be able to determine from quality prots if the quality scores are binned
+# you should be able to determine from quality profiles if the quality scores are binned
 
 plot_x_limit <- round(ave_seq_length/50)*50+25
 toplot_fwd <- sampleFs
@@ -544,6 +547,7 @@ save.image(file = str_c(Study,".Rdata"))
 if(keep_time) toc()
 if(play_audio) beep(sound = sound_n)
 
+# may be they have been quality processed
 
 # filtering and trimming --------------------------------------------------
 
@@ -566,7 +570,7 @@ truncf<- NULL # NULL in ITS
 truncr<- NULL # NULL if not paired end and ITS
 # the ITS DADA2 pipeline does not enforce a fixed length, but this might also result in removing too many
 # sequences due to poor quality at the 3' end
-trim_left = 0 # use a length 2 vector c(x,y) if paired end or a single number if not
+trim_left = c(0,0) # use a length 2 vector c(x,y) if paired end or a single number if not
 if(platform == "Ion_Torrent") trim_left <- trim_left+15
 maxEEf = 2 # with very high quality data can be reduced to 1
 maxEEr = 5 # 2 very restrictive, 5 does well in most cases, not needed for single end
@@ -1012,7 +1016,7 @@ save.image(file = str_c(Study,".Rdata"))
 
 # save a smaller version of workspace which will be needed later
 save(taxtab, seqtab.nochim, track2, Study, target, region, seq_accn, DOI,
-     primer_f, primer_r, target1, target2, taxtab2, 
+     primer_f, primer_r, target1, target2, taxtab2, primer_occ, primer_occ_2,
      file = str_c(Study,"_small.Rdata"))
 if (play_audio) beep(sound = sound_n)
 
@@ -1045,8 +1049,13 @@ if(filter_ASVs){
 # but it is already prohibitive with 20k
 # and usually not worth the effort
 
-dotree <- T # avoid if overlapping == F
-if(dim(seqtab.nochim)[2]>10000 | overlapping == F | merge_option == "mixed") {
+dotree <- F # avoid if overlapping == F
+
+if(merge_option == "mixed" & dotree == T){
+  cat(red("\nYour option for merging is 'mixed': do you really want to infer the phylogenetic tree?\n"))
+}
+
+if(dim(seqtab.nochim)[2]>10000 | overlapping == F) {
   dotree <- F
   }
 
@@ -1191,7 +1200,7 @@ write_tsv(study, str_c(Study,"_study.txt"))
 # check naming of the geoloc info
 
 samples <- samples %>%
-  mutate(description = str_c(Host, Sample.Name, sep =", "))
+  mutate(description = str_c(Sample.Name, geographic_location_.region_and_locality., sep =", "))
 samples <- samples %>%
   mutate(Sample_Name = Run) 
 
@@ -1200,7 +1209,7 @@ samples <- samples %>%
 # use these if part or all of the geolocation information is missing
 # samples$geo_loc_name_country <- "your country here"
 # samples$geo_loc_name_country_continent <- "your continent here"
-# samples$lat_lon <- NA_character_
+samples$lat_lon <- NA_character_
 
 
 # create label2 (to avoid numbers as first char.; s. can be removed later with
@@ -1384,18 +1393,25 @@ if(use_logr){
                   primerrseq = REV.orients)
   log_print(primers, console = F)
   handling_primers <- list(
-    checkprimers <- check_primers,
-    usecutatpt <- use_cutadapt
+    checkprimers = check_primers,
+    usecutatpt = use_cutadapt,
+    primer_occ_pre = primer_occ,
+    primer_occ_post = primer_occ_2
   )
   log_print(handling_primers, console = F)
   log_print(filter_and_trim_par, console = F)
-  merge_opt <- list(
+  if(paired_end) {merge_opt <- list(
     pend = paired_end,
     ovl = overlapping,
     mrgopt = merge_option,
     max_mismatch = maxM,
-    min_ovlap = minO
-  )
+    min_ovlap = minO)} else {
+      merge_opt <- list(
+        pend = paired_end,
+        ovl = overlapping,
+        mrgopt = merge_option)
+    }
+  
   dotree
   log_close()
 }
