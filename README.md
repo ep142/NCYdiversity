@@ -14,4 +14,6 @@ My scripts and data for the NYCdiversity project.
   
   + run the bigdata_part1 script as many times as the groups you created in the sequences with getHeader, to do preprocessing, filtering, estimation of the error model, ASV inference and merging and produce sequence tables. 
   
-  + run the bigdata_part2 script to merge the sequence tables, do taxonomy assignment, infer phylogenetic tree, assemble a phyloseq object and produce files for imponrt in FoodMicrobionet
+  + run the bigdata_part2 script to merge the sequence tables, do taxonomy assignment, infer phylogenetic tree, assemble a phyloseq object and produce files for imponrt in FoodMicrobionet  
+  
+* FMBN5_0_1 a folder containing R lists for FoodMicrobionet, table specifications and summary statistics
