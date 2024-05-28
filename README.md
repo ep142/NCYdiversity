@@ -1,4 +1,4 @@
-# NYCdiversity
+# NCYdiversity
 
 My scripts and data for the NCYdiversity (Non-Conventional Yeast diversity) project.
 
