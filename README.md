@@ -17,3 +17,7 @@ My scripts and data for the NYCdiversity project.
   + run the bigdata_part2 script to merge the sequence tables, do taxonomy assignment, infer phylogenetic tree, assemble a phyloseq object and produce files for imponrt in FoodMicrobionet  
   
 * FMBN5_0_1 a folder containing R lists for FoodMicrobionet, table specifications and summary statistics
+
+## Acknowledgements.  
+
+This work was was carried out within the PRIN 2022 Project METAOlive 2022NN28ZZ and received funding from the European Union Next-GenerationEU, CUP C53D23005460006 (PIANO NAZIONALE DI RIPRESA E RESILIENZA (PNRR) – MISSIONE 4 COMPONENTE 2,  INVESTIMENTO 1.4 – D.D. 1048 14/07/2023). This script and its contents reflects only the authors’ views and opinions,  neither the European Union nor the European Commission can be considered  responsible for them.

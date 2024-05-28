@@ -1,9 +1,10 @@
-# DADA2/Bioconductor pipeline for ITS, modified, v7.4.8, 13/03/24
+# DADA2/Bioconductor pipeline for ITS, modified, v7.4.9, 13/03/24
 
 #  Description & instructions ---------------------------------------------
 
-# This script is designed to process small studies (<60-80 samples, but even 10  
-# can be processed depending on RAM) using the DADA2 pipeline 
+# This script is designed to process sequences for small studies (<60-80 
+# samples, but even 100  can be processed depending on RAM) of amplicon targeted 
+# metagenomic data for fungi using the DADA2 pipeline 
 # https://benjjneb.github.io/dada2/tutorial.html
 # with modifications for ITS analysis 
 # https://benjjneb.github.io/dada2/ITS_workflow.html
@@ -34,7 +35,7 @@
 #    3.3 using the sratoolkit download the fastq files from SRA and put them in the fastq folder
 #    3.4 put the metadata in the metadata folder
 # 4. if you are using data delivered by Novogene
-#    4.1 put the folder you received from Novogene in the data folder
+#    4.1 put the folder you received from Novogene in the project folder
 #    4.2 create the filtered and metadata folders within the data folder
 #    4.3 put the metadata in the metadata folder; the first column must match 
 #        sample names (as received from Novogene, these are also the names of 
@@ -304,10 +305,19 @@ if(use_accn_list) {
 
 if(use_accn_list) samdf <- dplyr::filter(samdf, Run %in% sample.names)
 
-if(all(sample.names %in% samdf$Run)){
-  cat("\nsamples in fastq files match samples in metadata\n")
-} else {
-  cat("\nWARNING samples in fastq files DO NOT match samples in metadata\n")
+if(data_type == "sra"){
+  if(all(sample.names %in% samdf$Run)){
+    cat("\nsamples in fastq files match samples in metadata\n")
+  } else {
+    cat("\nWARNING samples in fastq files DO NOT match samples in metadata\n")
+  }
+} else{
+  # ad hoc for your data
+  if(all(sample.names %in% samdf$Library_Name)){
+    cat("\nsamples in fastq files match samples in metadata\n")
+  } else {
+    cat("\nWARNING samples in fastq files DO NOT match samples in metadata\n")
+  }
 }
 
 
@@ -566,8 +576,8 @@ if(paired_end) {filtRs <- file.path(filt_path, basename(fnRs))}
 # Novogene "clean" sequences are merged and quality processed, with primers removed
 # reverse not applicable here: in some cases it is better to remove a few nt from the end
 # NOTE: with ITS for fungi you should aim at a sum of 500 bp between forward and reverse to have good merging
-truncf<- NULL # NULL in ITS
-truncr<- NULL # NULL if not paired end and ITS
+truncf<- 0 # 0 in ITS
+truncr<- 0 # 0 if not paired end and ITS
 # the ITS DADA2 pipeline does not enforce a fixed length, but this might also result in removing too many
 # sequences due to poor quality at the 3' end
 trim_left = c(0,0) # use a length 2 vector c(x,y) if paired end or a single number if not
@@ -958,8 +968,7 @@ if(play_audio) beep(sound=6)
 
 # create a column with row names 
 
-taxtab2 <- as_tibble(rownames_to_column(as.data.frame(taxtab, 
-                                                      stringsAsFactors = F), "ASV"))
+taxtab2 <- as_tibble(taxtab, rownames ="ASV")
 if(!"Species" %in% colnames(taxtab)) taxtab2$Species <- NA_character_
 
 # may be in the future add a variable with the Study, just to merge the database of ASVs
@@ -1015,9 +1024,15 @@ rm(ref_fasta)
 save.image(file = str_c(Study,".Rdata"))
 
 # save a smaller version of workspace which will be needed later
-save(taxtab, seqtab.nochim, track2, Study, target, region, seq_accn, DOI,
-     primer_f, primer_r, target1, target2, taxtab2, primer_occ, primer_occ_2,
-     file = str_c(Study,"_small.Rdata"))
+if(use_cutadapt){
+  save(taxtab, seqtab.nochim, track2, Study, target, region, seq_accn, DOI,
+       primer_f, primer_r, target1, target2, taxtab2, primer_occ, primer_occ_2,
+       file = str_c(Study,"_small.Rdata"))
+} else {
+  save(taxtab, seqtab.nochim, track2, Study, target, region, seq_accn, DOI,
+       primer_f, primer_r, target1, target2, taxtab2,
+       file = str_c(Study,"_small.Rdata"))
+}
 if (play_audio) beep(sound = sound_n)
 
 
@@ -1108,25 +1123,52 @@ save.image(file = str_c(Study,"_small.Rdata"))
 seq_sums <- rowSums(seqtab.nochim)
 runs_to_keep <- which(seq_sums>0)
 runs <- rownames(seqtab.nochim)[runs_to_keep]
-if(length(runs_to_keep) < dim(seqtab.nochim)[1]) {
-  seqtab.nochim <- seqtab.nochim[runs_to_keep,]
-  samdf <- dplyr::filter(samdf, Run %in% runs)
+# you may need to adapt this code
+if(data_type == "sra") {
+  if(length(runs_to_keep) < dim(seqtab.nochim)[1]) {
+    seqtab.nochim <- seqtab.nochim[runs_to_keep,]
+    samdf <- dplyr::filter(samdf, Run %in% runs)
+  }
+} else {
+  if(length(runs_to_keep) < dim(seqtab.nochim)[1]) {
+    seqtab.nochim <- seqtab.nochim[runs_to_keep,]
+    samdf <- dplyr::filter(samdf, Library_Name %in% runs)
+  }
 }
 
 # sanity check
-if(all(rownames(seqtab.nochim) %in% samdf$Run)){
-  cat("\nsamples in sequence table match samples in metadata\n")
+# you may need to adapt this code
+if(data_type == "sra") {
+  if(all(rownames(seqtab.nochim) %in% samdf$Run)){
+    cat("\nsamples in sequence table match samples in metadata\n")
+  } else {
+    cat("\nWARNING samples in sequence table DO NOT match samples in metadata\n")
+  }
 } else {
-  cat("\nWARNING samples in sequence table DO NOT match samples in metadata\n")
+  if(all(rownames(seqtab.nochim) %in% samdf$Library_Name)){
+    cat("\nsamples in sequence table match samples in metadata\n")
+  } else {
+    cat("\nWARNING samples in sequence table DO NOT match samples in metadata\n")
+  }
 }
 # rownames(seqtab.nochim) <- sapply(strsplit(rownames(seqtab.nochim), "_", fixed = T), `[`, 1)
 
 # add final number of sequences and number of issues from track2
-samdf <- left_join(samdf, select(track2, Run = sample_name, n_reads2 = nonchim, 
-                                 n_issues))
+# you may need to adapt this code
+if(data_type == "sra") {
+  samdf <- left_join(samdf, select(track2, Run = sample_name, n_reads2 = nonchim, 
+                                   n_issues))
+} else {
+  samdf <- left_join(samdf, select(track2, Library_Name = sample_name, n_reads2 = nonchim, 
+                                   n_issues))
+}
 
 samdf <- as.data.frame(samdf)
-rownames(samdf) <- samdf$Run
+if(data_type == "sra"){
+  rownames(samdf) <- samdf$Run
+} else {
+  rownames(samdf) <- samdf$Library_Name
+  }
 
 # a transposed sequence table
 seqtab_t = t(seqtab.nochim)
@@ -1181,8 +1223,8 @@ read_length <- round(mean(nchar(rownames(ttab)), na.rm = T))
 
 # adapt this or set manually a comma delimited string of countries.
 loc_list <- ifelse("geo_loc_name_country" %in% colnames(samples),
-                    str_c(list_flatten(as.list(distinct(samdf, geo_loc_name_country))), collapse =", "),
-                    NA_character_)
+                   str_flatten(pull(distinct(samdf, geo_loc_name_country)), collapse =", "),
+                   NA_character_)
 
 # put together and save study info
 study <- tibble(target = target, region = region, platform = instrument,
@@ -1201,8 +1243,9 @@ write_tsv(study, str_c(Study,"_study.txt"))
 
 samples <- samples %>%
   mutate(description = str_c(Sample.Name, geographic_location_.region_and_locality., sep =", "))
-samples <- samples %>%
-  mutate(Sample_Name = Run) 
+if(data_type == "sra"){
+  samples <- samples %>%
+    mutate(Sample_Name = Run) }
 
 # information of geoloc (and names of the field) is very inconsistent:
 # check the info in your sample metadata and adatp these commands
@@ -1231,7 +1274,7 @@ if(data_type == "sra"){
            SRA_run = NA_character_) %>%
     select(Run, label2, n_reads2, n_issues, description, target1, target2, 
            biosample = Sample_code, geo_loc_country = geo_loc_name_country, 
-           geo_loc_continent = geo_loc_name_continent, lat_lon = Latlon)
+           geo_loc_continent = geo_loc_name_continent, lat_lon = Latlon, Sample_Name)
 }
 
 
@@ -1392,12 +1435,19 @@ if(use_logr){
                   primerfseq = FWD.orients,
                   primerrseq = REV.orients)
   log_print(primers, console = F)
-  handling_primers <- list(
-    checkprimers = check_primers,
-    usecutatpt = use_cutadapt,
-    primer_occ_pre = primer_occ,
-    primer_occ_post = primer_occ_2
-  )
+  if(use_cutadapt){ 
+    list(
+      checkprimers = check_primers,
+      usecutatpt = use_cutadapt,
+      primer_occ_pre = primer_occ,
+      primer_occ_post = primer_occ_2
+    )
+  } else{
+    handling_primers <- list(
+      checkprimers = check_primers,
+      usecutatpt = use_cutadapt
+    )
+  }
   log_print(handling_primers, console = F)
   log_print(filter_and_trim_par, console = F)
   if(paired_end) {merge_opt <- list(
