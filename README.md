@@ -1,6 +1,6 @@
 # NYCdiversity
 
-My scripts and data for the NYCdiversity project.
+My scripts and data for the NCYdiversity (Non-Conventional Yeast diversity) project.
 
 * bioconductor_pip_ITS_functions.R functions used by the modified bioconductor pipeline for ITS. 
 
