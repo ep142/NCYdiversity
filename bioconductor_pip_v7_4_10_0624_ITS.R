@@ -1,4 +1,4 @@
-# DADA2/Bioconductor pipeline for ITS, modified, v7.4.9, 13/03/24
+# DADA2/Bioconductor pipeline for ITS, modified, v7.4.10, 05/06/24
 
 #  Description & instructions ---------------------------------------------
 
@@ -18,7 +18,7 @@
 # https://github.com/benjjneb/dada2/issues/791 and a workaround for  handling
 # ITS sequences which do not merge properly due to excess length described here:
 # https://github.com/benjjneb/dada2/issues/537
-# in this version UNITE general release for fungi is used as a taxonomic reference
+# in this version UNITE general release for fungi with singletons is used as a taxonomic reference
 # Finally, the script assembles an object which can be used in the future for
 # redoing the taxonomic assignment in an automated way
 
@@ -959,6 +959,9 @@ RC <- T # true by default
 
 # UNITE
 ref_fasta <- file.path(taxdb_dir, "sh_general_release_dynamic_s_25.07.2023.fasta")
+
+# the most recent release is sh_general_release_dynamic_s_04.04.2024.fasta 
+
 taxtab <- assignTaxonomy(seqtab.nochim, refFasta = ref_fasta, multithread = TRUE, 
                          tryRC = RC)
 
@@ -1436,7 +1439,7 @@ if(use_logr){
                   primerrseq = REV.orients)
   log_print(primers, console = F)
   if(use_cutadapt){ 
-    list(
+    handling_primers <- list(
       checkprimers = check_primers,
       usecutatpt = use_cutadapt,
       primer_occ_pre = primer_occ,
