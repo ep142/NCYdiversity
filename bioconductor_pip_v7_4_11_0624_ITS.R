@@ -1,4 +1,4 @@
-# DADA2/Bioconductor pipeline for ITS, modified, v7.4.10, 05/06/24
+# DADA2/Bioconductor pipeline for ITS, modified, v7.4.11, 275/06/24
 
 #  Description & instructions ---------------------------------------------
 
@@ -766,7 +766,7 @@ maxM = 0 # maximum mismatch should be 0
 # merge_option
 # "fwd" will only use forward sequences (it is actually the same as operating on 
 # non-paired end sequences
-# "merge" will attemt a merge on all sequences
+# "merge" will attempt a merge on all sequences
 # "mixed" will try to merge all sequence it can and concatenate the others
 # with this option no tree is returned
 # minO and maxM are the minimum overlap and max mismatch
