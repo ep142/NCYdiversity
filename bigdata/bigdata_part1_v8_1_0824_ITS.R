@@ -2,7 +2,7 @@
 # DADA2/Bioconductor pipeline for big data, modified
 # part 2, create sequence tables
 #
-# bigdata_part1_v7_0_1_0224_ITS
+# bigdata_part1_v8_0824_ITS
 ################################################################################
 
 # This script is designed to process large studies using the
@@ -12,15 +12,15 @@
 # a further script (bigdata_part2) will carry out further processing needed to ready the output for import
 # into FoodMicrobionet
 
-# This version of the script (v7, 13/2/24) includes options
+# This version of the script (v8.1, 7/8/24) includes options
 # for single end/paired end data sets obtained with Illumina or 454 or
-# Ion Torrent
-# and will perform steps up to the creation of the sequence table
+# Ion Torrent and will perform steps up to the creation of the sequence table
+# including optional primer removal with cutadapt
 # In addition it includes a workaround for Illumina Novaseq sequences described here:
 # https://github.com/benjjneb/dada2/issues/791 and a workaround for  handling
 # ITS sequences which do not merge properly due to excess length described here:
 # https://github.com/benjjneb/dada2/issues/537
-# in this version UNITE general release for fungi is used as a taxonomic reference
+# In this version UNITE general release for fungi is used as a taxonomic reference
 # For each iteration of the script over the identifiers.txt table, created with
 # the getHeader script, a new sequence table is created and saved from the
 # corresponding group fo sequences. These are then assembled and processed
@@ -131,7 +131,7 @@ source(file.path("..","bioconductor_pip_ITS_functions.R"))
 
 # open identifiers (a file containing the grouping of your runs)
 
-mygroup <- 4
+mygroup <- 3
 # needs to be adapted for each iteration
 # remember there is also a copy created which is never modified
 if (mygroup==1){
@@ -159,45 +159,50 @@ if (mygroup==1){
   # when using data other than those downloaded from SRA replace
   # the accession number with whichever identifier you want to use
   
-  Study <- "ERP123468" # PRJEB39898
+  Study <- "SRP235327" # PRJNA594469
   target <- "ITS region"
-  region <- "ITS2"
+  region <- "ITS1"
   seq_accn <- Study
-  DOI <- "10.3389/fmicb.2020.586614"
+  DOI <- "10.1128/msphere.00534-20"
   
   # information on the platform and arrangement
   
-  platform <- "Illumina" # (or set to "Illumina" or "Ion_Torrent" or "F454")
+  platform <- "Illumina_miseq" #  (set to "Illumina_miseq", "Illumina_novaseq", "Illumina_HiSeq" or "Ion_Torrent" or "F454")
   paired_end <- T # set to true for paired end, false for single end
   overlapping <- T # here set to F because of poor quality of reverse sequences which prevented merging
-
+  
   # Primers --------------------------------------------
   # all in standard 5'-3' orientation
   # ITS1:
   # ITS1-F_KYO2 (18S SSU 1733–1753) TAGAGGAAGTAAAAGTCGTAA 21 bp and ITS2_KYO2 (5.8 2046–2029) CTHGGTCATTTAGAGGAASTAA 22 bp
-  # Toju, H., Tanabe, A.S., Yamamoto, S., Sato, H., 2012. High-Coverage ITS Primers for the DNA-Based Identification of Ascomycetes and Basidiomycetes in Environmental Samples. PLoS ONE 7, e40863. https://doi.org/10.1371/journal.pone.0040863
+  # (Toju et al., 2012)
   # ITS1FI2 GAACCWGCGGARGGATCA (18 bp) and 5.8S CGCTGCGTTCTTCATCG (17 bp)
-  # BITS CTACCTGCGGARGGATCA (26 bp) and B58S3 GAGATCCRTTGYTRAAAGTT (20 bp)
+  # BITS ACCTGCGGARGGATCA (18 bp) and B58S3 GAGATCCRTTGYTRAAAGTT (20 bp)  (Bokulich and Mills, 2013)
   # ITS1 TCCGTAGGTGAACCTGCGG (19 bp) and ITS4 TCCGTAGGTGAACCTGCGG (19 bp)
+  # ITS5F GGAAGTAAAAGTCGTAACAAGG (22 bp)	ITS1R	GCTGCGTTCTTCATCGATGC (20 bp)
+  # ITS1F TTGGTCATTTAGAGGAAGTAA (21 bp) ITS2 GCTGCGTTCTTCATCGATGC (20 bp)
+  # ITS1Fv2 CTTGGTCATTTAGAGGAAGTAA (22 bp) ITS1R GCTGCGTTCTTCATCGATGC (20 bp) (White et al., 1990)
   
   # ITS2: 
   # ITS3F GCATCGATGAAGAACGCAGC ITS4R TCCTCCGCTTATTGATATGC 
   # (White TJ, Bruns TD, Lee SB, Taylor JW (1990) Amplification and direct sequencing of fungal ribosomal RNA genes for phylogenetics. In: Innis MA,Gelfand DH, Sninsky JJ, White TJ, editors. PCR protocols: a guide to methodsand applications. United States: Academic Press. pp. 315–322)
-  # ITS86F (GTGAATCATCGAATCTTTGAA) 21 bp and ITS4 (TCCTCCGCTTATTGATATGC) 20 bp
-  # ITS3f (GCATCGATGAAGAACGCAGC) 20 bp and ITS4-KYO1 (AHCGATGAAGAACRYAG) 17 bp Toju et al., 2012
+  # ITS86F GTGAATCATCGAATCTTTGAA (21 bp) and ITS4 TCCTCCGCTTATTGATATGC (20 bp)
+  # ITS3f GCATCGATGAAGAACGCAGC (20 bp) and ITS4-KYO1 TCCTCCGCTTWTTGWTWTGC (20 bp) Toju et al., 2012
+  # F2045 GCATCGATGAAGAACGCAGC (20 bp) and R2390 TCCTCCGCTTATTGATATGC (20 bp)
+  # ITS3-KYO2 GATGAAGAACGYAGYRAA (18 bp)) and ITS4 TCCTCCGCTTATTGATATGC (20 bp)
   
   # ITS1 5.8S and ITS2:
   # ITS1 TCCGTAGGTGAACCTGCGG (19 bp) and ITS4 TCCTCCGCTTATTGATATGC (20 bp)
   
   # expected amplicon length is variable
-  primer_f <- "ITS3f" # 21 bp
-  primer_r <- "ITS2_KYO2"  # 22 bp
+  primer_f <- "ITS1F" 
+  primer_r <- "ITS2"
   
   # NOTE: be extra careful in indicating primer sequences because this will affect
   # primer detection and primer removal by cutadapt
   
-  FWD <- "GCATCGATGAAGAACGCAGC"  ## CHANGE THIS to your forward primer sequence
-  REV <- "TCCTCCGCTTATTGATATGC" ## CHANGE THIS to your reverse primer sequence
+  FWD <- "TTGGTCATTTAGAGGAAGTAA"  ## CHANGE THIS to your forward primer sequence
+  REV <- "GCTGCGTTCTTCATCGATGC" ## CHANGE THIS to your reverse primer sequence
   
   target1 <- "ITS_DNA"
   target2 <- region
@@ -225,7 +230,7 @@ if (mygroup==1){
                    primerf_seq = FWD, primerr_seq = REV,
                    target1 = target1)
   saveRDS(gen_data, file = "gen_data.RDS")
-} else {
+  } else {
   gen_data <- readRDS(file = "gen_data.RDS")
   Study <- gen_data$Study
   target <- gen_data$target
@@ -388,34 +393,38 @@ if(all(sample.names %in% samdf$Run)){
 # if you have chosen to check primer visually take note now of their occurrence 
 # and the length of the forward and reverse sequence to trim at the 5' end
 
-if(keep_time) tic("\nReading sequences")
 # check for occurrence of primers and adapters on a sample of forward and
-# reverse sequences
-# get a sample of 6 sequences
-sampleFs <- if(length(fnFs)>=6) sample(fnFs,6) else fnFs[1:length(fnFs)]
-# works with .fastq and fastq.gz
-myFwsample <- ShortRead::readFastq(sampleFs)
-print(head(sread(myFwsample),10))
-print(tail(sread(myFwsample),10))
-ave_seq_length_f <- round(mean(sread(myFwsample)@ranges@width))
-ave_seq_length <- ave_seq_length_f
-
-cat("\naverage sequence length for forward sequences is", ave_seq_length_f, "bp\n")
-
-# same for reverse
-if(paired_end){
-  sampleRs <- if(length(fnRs)>=6) sample(fnRs,6) else fnRs[1:length(fnRs)]
-  myRvsample <- ShortRead::readFastq(sampleRs)
-  print(head(sread(myRvsample),10))
-  print(tail(sread(myRvsample),10))
-  ave_seq_length_r <- round(mean(sread(myRvsample)@ranges@width))
-  cat("\naverage sequence length for reverse sequences is", ave_seq_length_f, "bp\n")
-  ave_seq_length <- mean(c(ave_seq_length_f, ave_seq_length_r))
+# reverse sequences, done only for the first group (if you suspect there are differences
+# do it on multiple groups)
+if (mygroup == 1) {
+  if(keep_time) tic("\nReading sequences")
+  # check for occurrence of primers and adapters on a sample of forward and
+  # reverse sequences
+  # get a sample of 6 sequences
+  sampleFs <- if(length(fnFs)>=6) sample(fnFs,6) else fnFs[1:length(fnFs)]
+  # works with .fastq and fastq.gz
+  myFwsample <- ShortRead::readFastq(sampleFs)
+  print(head(sread(myFwsample),10))
+  print(tail(sread(myFwsample),10))
+  ave_seq_length_f <- round(mean(sread(myFwsample)@ranges@width))
+  ave_seq_length <- ave_seq_length_f
+  
+  cat("\naverage sequence length for forward sequences is", ave_seq_length_f, "bp\n")
+  
+  # same for reverse
+  if(paired_end){
+    sampleRs <- if(length(fnRs)>=6) sample(fnRs,6) else fnRs[1:length(fnRs)]
+    myRvsample <- ShortRead::readFastq(sampleRs)
+    print(head(sread(myRvsample),10))
+    print(tail(sread(myRvsample),10))
+    ave_seq_length_r <- round(mean(sread(myRvsample)@ranges@width))
+    cat("\naverage sequence length for reverse sequences is", ave_seq_length_f, "bp\n")
+    ave_seq_length <- mean(c(ave_seq_length_f, ave_seq_length_r))
+  }
+  
+  if(play_audio) beep(sound = sound_n)
+  if(keep_time) toc()
 }
-
-if(play_audio) beep(sound = sound_n)
-if(keep_time) toc()
-
 #  check primers automatically --------------------------------------------
 
 if(check_primers == "auto") {
@@ -554,50 +563,52 @@ if(use_cutadapt){
 
 # creates quality profile plots --------------------------------
 
-if(keep_time) tic("\ncreate quality profile plots")
-
-# adapt this if you want to pick specific runs
-
-plot_x_limit <- round(ave_seq_length/50)*50+25
-toplot_fwd <- sampleFs
-qplotfwd <- plotQualityProfile(toplot_fwd) +
-  scale_x_continuous(limits = c(0,plot_x_limit), 
-                     breaks = seq(0,plot_x_limit,25)) + 
-  ggtitle("Fwd") + 
-  theme(panel.grid.major.y = element_line(colour="grey75", linewidth = 0.5, linetype = 3),
-        axis.text.x = element_text(angle = 90, hjust = 1))
-
-qplotfwd 
-# gray scale is the number of sequences of a given quality at a given position
-# green average quality, continuous orange line median quality, 
-# dashed 25th e 75th percentile;
-# if the plot varies in length a continuous red line shows the % of sequences
-# extending to this length
-
-if(paired_end){
-  toplot_rev <- sampleRs
-  qplotrev <- plotQualityProfile(toplot_rev) + 
+if(mygroup == 1){
+  if(keep_time) tic("\ncreate quality profile plots")
+  
+  # adapt this if you want to pick specific runs
+  
+  plot_x_limit <- round(ave_seq_length/50)*50+25
+  toplot_fwd <- sampleFs
+  qplotfwd <- plotQualityProfile(toplot_fwd) +
     scale_x_continuous(limits = c(0,plot_x_limit), 
                        breaks = seq(0,plot_x_limit,25)) + 
-    ggtitle("Rev") + 
-    theme(panel.grid.major.y = element_line(colour="grey75", linewidth=0.5, linetype = 3),
+    ggtitle("Fwd") + 
+    theme(panel.grid.major.y = element_line(colour="grey75", linewidth = 0.5, linetype = 3),
           axis.text.x = element_text(angle = 90, hjust = 1))
-  qplotrev
-}
-
-rm(myFwsample)
-if (paired_end) rm(myRvsample)
-
-# HINT make a note here of what you have done for reproducibility reasons: 
-# primers have been removed
-
-# save and remove object which won't be needed
-if(paired_end){
-  save(qplotfwd, qplotrev, file = str_c(gen_data$Study,"_", mygroup, "qplots.Rdata"))
-  rm(qplotfwd, qplotrev)
-} else {
-  save(qplotfwd, file = str_c(gen_data$Study,"_", mygroup, "qplots.Rdata"))
-  rm(qplotfwd)
+  
+  qplotfwd 
+  # gray scale is the number of sequences of a given quality at a given position
+  # green average quality, continuous orange line median quality, 
+  # dashed 25th e 75th percentile;
+  # if the plot varies in length a continuous red line shows the % of sequences
+  # extending to this length
+  
+  if(paired_end){
+    toplot_rev <- sampleRs
+    qplotrev <- plotQualityProfile(toplot_rev) + 
+      scale_x_continuous(limits = c(0,plot_x_limit), 
+                         breaks = seq(0,plot_x_limit,25)) + 
+      ggtitle("Rev") + 
+      theme(panel.grid.major.y = element_line(colour="grey75", linewidth=0.5, linetype = 3),
+            axis.text.x = element_text(angle = 90, hjust = 1))
+    qplotrev
+  }
+  
+  rm(myFwsample)
+  if (paired_end) rm(myRvsample)
+  
+  # HINT make a note here of what you have done for reproducibility reasons: 
+  # primers have been removed
+  
+  # save and remove object which won't be needed
+  if(paired_end){
+    save(qplotfwd, qplotrev, file = str_c(gen_data$Study,"_", mygroup, "qplots.Rdata"))
+    rm(qplotfwd, qplotrev)
+  } else {
+    save(qplotfwd, file = str_c(gen_data$Study,"_", mygroup, "qplots.Rdata"))
+    rm(qplotfwd)
+  }
 }
 
 
@@ -641,14 +652,17 @@ filter_and_trim_par <- as.data.frame(cbind(truncf, truncr, trim_left,
                                            max_length, min_length))
 
 # matchIDs = true if prefiltered in QIIME;
-basename(cutFs) %in% basename(filtFs)
+
 if(use_cutadapt) {
-  tofiltFs <- cutFs[basename(cutFs) %in% basename(filtFs)]
+  filt_sel <- which(basename(cutFs) %in% basename(fnFs))
+  tofiltFs <- cutFs[filt_sel]
 } else {
   tofiltFs <- fnFs
 }
 if(paired_end) {
-  if(use_cutadapt) {tofiltRs <- cutRs[basename(cutRs) %in% basename(filtRs)]
+  if(use_cutadapt) {
+    filt_sel <- which(basename(cutRs) %in% basename(fnRs))
+    tofiltRs <- cutRs[filt_sel]
   } else {
     tofiltRs <- fnRs
   }
@@ -723,7 +737,15 @@ if(keep_time) tic("\nlearning error rates")
 # another option could be randomize = T, to randomly pick samples for error
 # estimates
 # this may take VERY LONG, especially for novaseq
-if(str_detect(platform, "novaseq")){
+
+qual_binned <- if_else(
+  str_detect(platform, "miseq") | str_detect(platform, "Ion_Torrent") | str_detect(platform, "F454"),
+  F, T)
+
+# or else set manually
+# qual_binned <- F
+
+if(qual_binned){
   errF <- learnErrors(filtFs, nbases=1e8, multithread=TRUE, randomize = F)
   if(paired_end) errR <- learnErrors(filtRs, nbases=1e8, multithread=TRUE, randomize = F)
 } else {
@@ -735,7 +757,8 @@ plotErrors(errF, nominalQ=TRUE) + ggtitle("Fwd")
 if(paired_end) plotErrors(errR, nominalQ=TRUE) + ggtitle("Rev")
 # look at how the black line follows the points, should be monotonic
 
-if(str_detect(platform,"novaseq")){
+
+if(qual_binned){
   save(errF, file = str_c(gen_data$Study,"_", mygroup,"_errF.Rdata"))
   new_errF_out <- getErrors(errF) %>%
     data.frame() %>%
@@ -780,14 +803,14 @@ maxM = 0 # maximum mismatch should be 0
 # merge_option
 # "fwd" will only use forward sequences (it is actually the same as operating on 
 # non-paired end sequences
-# "merge" will attemt a merge on all sequences
+# "merge" will attempt a merge on all sequences
 # "mixed" will try to merge all sequence it can and concatenate the others
 # with this option no tree is returned
 # minO and maxM are the minimum overlap and max mismatch
 merge_option <- "mixed"
 
 if(mygroup == 1){
-  gendata$merge_option <- merge_option
+  gen_data$merge_option <- merge_option
   saveRDS(gen_data, file = "gen_data.RDS")
 }
 
@@ -797,6 +820,12 @@ names(mergers) <- sample.names
 n_samples <- length(sample.names)
 getN <- function(x) sum(getUniques(x)) # a function for getting number of sequences out of dada
 denoised <- vector(mode = "integer", length = n_samples)
+
+# ad hoc if you need to remove a problematic sample, here SRR10613791
+# which(sample.names == "SRR10613791")
+# length(sample.names)
+# sample.names <- sample.names[-40]
+# length(sample.names)
 
 for(sam in sample.names) {
   sample_index_F <- which(str_detect(filtFs, sam))
@@ -835,6 +864,8 @@ for(sam in sample.names) {
 
   mergers[[sam]] <- merger
 }
+lapply(mergers, class)
+
 
 if(play_audio) beep(sound = sound_n)
 if(keep_time) toc()
@@ -843,7 +874,10 @@ rm(derepF); rm(derepR)
 
 
 # Build sequence table  -----------------------------------------------
-seqtab <- makeSequenceTable(mergers)
+# remove if the object is NULL
+null_mergers <-which(sapply(mergers, class)=="NULL")
+
+seqtab <- makeSequenceTable(mergers[-null_mergers])
 
 # save data
 save.image(file = str_c(gen_data$Study,"_", mygroup, ".Rdata"))
@@ -881,8 +915,8 @@ save(seqtab_f, file = str_c("seqtab_f_", mygroup, ".Rdata"))
 
 # sanity check (without chimera step)
 
-track <- cbind(out, denoised, 
-               sapply(mergers, getN), 
+track <- cbind(out[-null_mergers,], denoised[-null_mergers], 
+               sapply(mergers[-null_mergers], getN), 
                rowSums(seqtab_f))
 # If processing a single sample, remove the sapply calls: e.g. replace sapply(dadaFs, getN) with getN(dadaFs)
 colnames(track) <- c("input", "filtered", "denoised", "merged", "tabled")
@@ -918,19 +952,32 @@ if(use_logr){
                   primerfseq = FWD.orients,
                   primerrseq = REV.orients)
   log_print(primers, console = F)
-  handling_primers <- list(
-    checkprimers <- check_primers,
-    usecutatpt <- use_cutadapt
-  )
+  if(use_cutadapt){ 
+    handling_primers <- list(
+      checkprimers = check_primers,
+      usecutatpt = use_cutadapt,
+      primer_occ_pre = primer_occ,
+      primer_occ_post = primer_occ_2
+    )
+  } else{
+    handling_primers <- list(
+      checkprimers = check_primers,
+      usecutatpt = use_cutadapt
+    )
+  }
   log_print(handling_primers, console = F)
   log_print(filter_and_trim_par, console = F)
-  merge_opt <- list(
+  if(paired_end) {merge_opt <- list(
     pend = paired_end,
     ovl = overlapping,
     mrgopt = merge_option,
     max_mismatch = maxM,
-    min_ovlap = minO
-  )
+    min_ovlap = minO)} else {
+      merge_opt <- list(
+        pend = paired_end,
+        ovl = overlapping,
+        mrgopt = merge_option)
+    }
   log_close()
 }
 

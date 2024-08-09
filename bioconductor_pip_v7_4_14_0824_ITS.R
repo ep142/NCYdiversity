@@ -1,4 +1,4 @@
-# DADA2/Bioconductor pipeline for ITS, modified, v7.4.11, 275/06/24
+# DADA2/Bioconductor pipeline for ITS, modified, v7.4.14, 5/8/24
 
 #  Description & instructions ---------------------------------------------
 
@@ -139,11 +139,11 @@ data_type <- "sra"
 # when using data other than those downloaded from SRA replace
 # the accession number with whichever identifier you want to use
 
-Study <- "ERP137138" # PRJEB52423
-target <- "ITS region" # or ITS region and 16S RNA gene (or 16S RNA)
-region <- "ITS1" # or ITSx and Vx
+Study <- "SRP108314" # PRJNA388367
+target <- "ITS region and 16S RNA gene" # or ITS region and 16S RNA gene (or 16S RNA)
+region <- "ITS2 and V3-V4" # or ITSx and Vx
 seq_accn <- Study
-DOI <- "10.1111/mec.16630"
+DOI <- "10.1016/j.micres.2017.09.004"
 
 # information on the platform and arrangement
 
@@ -158,7 +158,7 @@ if (!paired_end) overlapping <- T # needed to run species assignment for SILVA
 # ITS1-F_KYO2 (18S SSU 1733–1753) TAGAGGAAGTAAAAGTCGTAA 21 bp and ITS2_KYO2 (5.8 2046–2029) CTHGGTCATTTAGAGGAASTAA 22 bp
 # (Toju et al., 2012)
 # ITS1FI2 GAACCWGCGGARGGATCA (18 bp) and 5.8S CGCTGCGTTCTTCATCG (17 bp)
-# BITS CTACCTGCGGARGGATCA (18 bp) and B58S3 GAGATCCRTTGYTRAAAGTT (20 bp)  (Bokulich and Mills, 2013)
+# BITS ACCTGCGGARGGATCA (18 bp) and B58S3 GAGATCCRTTGYTRAAAGTT (20 bp)  (Bokulich and Mills, 2013)
 # ITS1 TCCGTAGGTGAACCTGCGG (19 bp) and ITS4 TCCGTAGGTGAACCTGCGG (19 bp)
 # ITS5F GGAAGTAAAAGTCGTAACAAGG (22 bp)	ITS1R	GCTGCGTTCTTCATCGATGC (20 bp)
 # ITS1F TTGGTCATTTAGAGGAAGTAA (21 bp) ITS2 GCTGCGTTCTTCATCGATGC (20 bp)
@@ -168,21 +168,22 @@ if (!paired_end) overlapping <- T # needed to run species assignment for SILVA
 # ITS3F GCATCGATGAAGAACGCAGC ITS4R TCCTCCGCTTATTGATATGC 
 # (White TJ, Bruns TD, Lee SB, Taylor JW (1990) Amplification and direct sequencing of fungal ribosomal RNA genes for phylogenetics. In: Innis MA,Gelfand DH, Sninsky JJ, White TJ, editors. PCR protocols: a guide to methodsand applications. United States: Academic Press. pp. 315–322)
 # ITS86F GTGAATCATCGAATCTTTGAA (21 bp) and ITS4 TCCTCCGCTTATTGATATGC (20 bp)
-# ITS3f GCATCGATGAAGAACGCAGC (20 bp) and ITS4-KYO1 AHCGATGAAGAACRYAG (17 bp) Toju et al., 2012
+# ITS3f GCATCGATGAAGAACGCAGC (20 bp) and ITS4-KYO1 TCCTCCGCTTWTTGWTWTGC (20 bp) Toju et al., 2012
 # F2045 GCATCGATGAAGAACGCAGC (20 bp) and R2390 TCCTCCGCTTATTGATATGC (20 bp)
+# ITS3-KYO2 GATGAAGAACGYAGYRAA (18 bp)) and ITS4 TCCTCCGCTTATTGATATGC (20 bp)
 
 # ITS1 5.8S and ITS2:
 # ITS1 TCCGTAGGTGAACCTGCGG (19 bp) and ITS4 TCCTCCGCTTATTGATATGC (20 bp)
 
 # expected amplicon length is variable
-primer_f <- "ITS1Fv2" # 22 bp
-primer_r <- "ITS2"  # 20 bp
+primer_f <- "ITS3-KYO2" # 18 bp
+primer_r <- "ITS4"  # 20 bp
 
 # NOTE: be extra careful in indicating primer sequences because this will affect
 # primer detection and primer removal by cutadapt
 
-FWD <- "CTTGGTCATTTAGAGGAAGTAA"  ## CHANGE THIS to your forward primer sequence
-REV <- "GCTGCGTTCTTCATCGATGC" ## CHANGE THIS to your reverse primer sequence
+FWD <- "GATGAAGAACGYAGYRAA"  ## CHANGE THIS to your forward primer sequence
+REV <- "TCCTCCGCTTATTGATATGC" ## CHANGE THIS to your reverse primer sequence
 
 target1 <- "ITS_DNA"
 target2 <- region
@@ -362,6 +363,10 @@ if(paired_end){
 }
 
 if(play_audio) beep(sound = sound_n)
+
+rm(myFwsample)
+if (paired_end) rm(myRvsample)
+gc()
 if(keep_time) toc()
 
 #  check primers automatically --------------------------------------------
@@ -535,8 +540,6 @@ if(paired_end){
   qplotrev
 }
 
-rm(myFwsample)
-if (paired_end) rm(myRvsample)
 
 # HINT make a note here of what you have done for reproducibility reasons: 
 # primers have been removed
@@ -593,12 +596,15 @@ filter_and_trim_par <- as.data.frame(cbind(truncf, truncr, trim_left,
 
 # matchIDs = true if prefiltered in QIIME;
 if(use_cutadapt) {
-  tofiltFs <- cutFs
+  filt_sel <- which(basename(cutFs) %in% basename(fnFs))
+  tofiltFs <- cutFs[filt_sel]
 } else {
   tofiltFs <- fnFs
 }
 if(paired_end) {
-  if(use_cutadapt) {tofiltRs <- cutRs
+  if(use_cutadapt) {
+    filt_sel <- which(basename(cutRs) %in% basename(fnRs))
+    tofiltRs <- cutRs[filt_sel]
   } else {
     tofiltRs <- fnRs
   }
@@ -958,7 +964,7 @@ list.files(taxdb_dir)
 RC <- T # true by default
 
 # UNITE
-ref_fasta <- file.path(taxdb_dir, "sh_general_release_dynamic_s_25.07.2023.fasta")
+ref_fasta <- file.path(taxdb_dir, "sh_general_release_dynamic_s_04.04.2024.fasta")
 
 # the most recent release is sh_general_release_dynamic_s_04.04.2024.fasta 
 
@@ -1245,7 +1251,7 @@ write_tsv(study, str_c(Study,"_study.txt"))
 # check naming of the geoloc info
 
 samples <- samples %>%
-  mutate(description = str_c(Sample.Name, geographic_location_.region_and_locality., sep =", "))
+  mutate(description = str_c(SampleName, sep =", "))
 if(data_type == "sra"){
   samples <- samples %>%
     mutate(Sample_Name = Run) }
@@ -1255,8 +1261,7 @@ if(data_type == "sra"){
 # use these if part or all of the geolocation information is missing
 # samples$geo_loc_name_country <- "your country here"
 # samples$geo_loc_name_country_continent <- "your continent here"
-samples$lat_lon <- NA_character_
-
+# samples$lat_lon <- NA_character_
 
 # create label2 (to avoid numbers as first char.; s. can be removed later with
 # tidyr::separate)
