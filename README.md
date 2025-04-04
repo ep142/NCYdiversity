@@ -4,11 +4,19 @@ My scripts and data for the NCYdiversity (Non-Conventional Yeast diversity) proj
 
 * bioconductor_pip_ITS_functions.R functions used by the modified bioconductor pipeline for ITS. 
 
-* bioconductor_pip_v7_4_0224_ITS.R the pipeline itself mostly taken from https://benjjneb.github.io/dada2/ITS_workflow.html but with several modifications. 
+* bioconductor_pip_v7_4_17_1124_ITS.R the pipeline itself mostly taken from [DADA2 tutorials](https://benjjneb.github.io/dada2/ITS_workflow.html but with several modifications). 
+
+* bioconductor_pip_v0_3_18_26S.R a pipeline designed to work with the custom training sets for SSU and LSU which I am adapting from SILVA 138.2 and which are available on Zenodo  
+
+  + [SSU training sets, beta version](https://zenodo.org/records/15044434)  
+  
+  + [LSU training sets, beta version](https://zenodo.org/records/15044501)  
+  
+* sanity_check_26S.R: a script for checking the quality of taxonomic assignments obtained with the LSU trainsets    
 
 * primer_pairs_fungi.txt a service table containing most frequently used primer pairs for ITS amplification, work in progress  
 
-* bigdata folder contains three scripts modeled after https://benjjneb.github.io/dada2/bigdata.html, with several modifications; you should 
+* bigdata folder contains three scripts modeled after [DADA2 tutorial for big data](https://benjjneb.github.io/dada2/bigdata.html), with several modifications; you should 
 
   +  run the getHeader script first (to partition the sequences in groups of manageable size)
   

@@ -457,12 +457,10 @@ run_acc_list_code <- F
 if(run_acc_list_code){
   acc_list_bacteria <- samdf |>
     arrange(Run) |>
-    dplyr::slice(1:18) |>
     dplyr::select(Run)
   write_tsv(acc_list_bacteria, file = "acc_list_bacteria.txt")
   acc_list_fungi <- samdf |>
     arrange(Run) |>
-    dplyr::slice(19:35) |>
     dplyr::select(Run)
   write_tsv(acc_list_fungi, file = "acc_list_fungi.txt")
 }
@@ -481,25 +479,46 @@ if(use_accn_list) {
 
 if(use_accn_list) samdf <- dplyr::filter(samdf, Run %in% sample.names)
 
-if(all(rownames(seqtab.nochim) %in% samdf$Run)){
-  cat("\nsamples in fastq files match samples in metadata\n")
+if(data_type == "sra"){
+  if(all(rownames(seqtab.nochim) %in% samdf$Run)){
+    cat("\nsamples in fastq files match samples in metadata\n")
+  } else {
+    cat("\nWARNING samples in fastq files DO NOT match samples in metadata\n")
+  }
 } else {
-  cat("\nWARNING samples in fastq files DO NOT match samples in metadata\n")
+  if(all(rownames(seqtab.nochim) %in% samdf$Library_Name)){
+    cat("\nsamples in fastq files match samples in metadata\n")
+  } else {
+    cat("\nWARNING samples in fastq files DO NOT match samples in metadata\n")
+  }
 }
 
+# check if any cols in seqtab have 0 sums
 # check if any cols in seqtab have 0 sums
 seq_sums <- rowSums(seqtab.nochim)
 runs_to_keep <- which(seq_sums>0)
 runs <- rownames(seqtab.nochim)[runs_to_keep]
-if(length(runs_to_keep) < dim(seqtab.nochim)[1]) {
-  seqtab.nochim <- seqtab.nochim[runs_to_keep,]
-  samdf <- dplyr::filter(samdf, Run %in% runs)
+if(data_type == "sra") {
+  if(length(runs_to_keep) < dim(seqtab.nochim)[1]) {
+    seqtab.nochim <- seqtab.nochim[runs_to_keep,]
+    samdf <- dplyr::filter(samdf, Run %in% runs)
+  }
+} else {
+  if(length(runs_to_keep) < dim(seqtab.nochim)[1]) {
+    seqtab.nochim <- seqtab.nochim[runs_to_keep,]
+    samdf <- dplyr::filter(samdf, Library_Name %in% runs)
+  }
 }
 
 # sanity check
-all(rownames(seqtab.nochim) %in% samdf$Run) # must be TRUE
-rownames(seqtab.nochim) <- sapply(strsplit(rownames(seqtab.nochim), "_", fixed = T), `[`, 1)
-all(rownames(seqtab.nochim) %in% samdf$Run) # TRUE
+# sanity check
+if(data_type == "sra") {
+  all(rownames(seqtab.nochim) %in% samdf$Run)
+} else {
+  all(rownames(seqtab.nochim) %in% samdf$Library_Name)
+} # must be TRUE
+# rownames(seqtab.nochim) <- sapply(strsplit(rownames(seqtab.nochim), "_", fixed = T), `[`, 1)
+# all(rownames(seqtab.nochim) %in% samdf$Run) # TRUE
 # add final number of sequences and number of issues from track2
 # add number of sequences to track2
 seqs <- as.data.frame(rowSums(seqtab.nochim))
@@ -507,8 +526,13 @@ seqs <- rownames_to_column(seqs, var = "Run")
 colnames(seqs)[2] <-"seqs"
 track2 <- left_join(track2, select(data = seqs, sample_name = Run, seqs))
 
-samdf <- full_join(samdf, select(track2, Run = sample_name, n_reads2 = data, 
-                                 n_issues))
+if(data_type == "sra") {
+  samdf <- left_join(samdf, select(track2, Run = sample_name, n_reads2 = nonchim, 
+                                   n_issues))
+} else {
+  samdf <- left_join(samdf, select(track2, Library_Name = sample_name, n_reads2 = nonchim, 
+                                   n_issues))
+}
 samdf <- as.data.frame(samdf)
 rownames(samdf) <- samdf$Run
 
@@ -521,7 +545,11 @@ seqtab_t <- t(seqtab.nochim)
 dim(seqtab_t)
 
 # may have dropped a few runs because they lacked seqs
-samdf_2 <- samdf %>% dplyr::filter(Run %in% colnames(seqtab_t))
+if(data_type == "sra"){
+  samdf_2 <- samdf %>% dplyr::filter(Run %in% colnames(seqtab_t))
+} else {
+  samdf_2 <- samdf %>% dplyr::filter(Library_Name %in% colnames(seqtab_t))
+}
 
 # just checking
 # colnames(seqtab_t) == row.names(samdf_2)
@@ -609,7 +637,7 @@ samples <- samples %>%
 
 # create label2 (to avoid numbers as first char.; s. can be removed later with
 # tidyr::separate)
-# need to be adjusted ad hoc
+# need to be adjusted ad hoc especially for lat_lon
 if(data_type == "sra"){
   samples <- samples %>%
     mutate(label2 = str_c("s.",Sample_Name), target1 = target1, 
@@ -624,8 +652,8 @@ if(data_type == "sra"){
            target2 = target2, SRA_Sample = NA_character_, 
            SRA_run = NA_character_) %>%
     select(Run, label2, n_reads2, n_issues, description, target1, target2, 
-           biosample = Sample_code, geo_loc_country = geo_loc_name_country, 
-           geo_loc_continent = geo_loc_name_continent, lat_lon = Latlon)
+           geo_loc_country = geo_loc_name_country, 
+           geo_loc_continent = geo_loc_name_country_continent, lat_lon, Sample_Name)
 }
 
 # save the sample information

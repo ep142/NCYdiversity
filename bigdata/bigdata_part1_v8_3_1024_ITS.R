@@ -2,7 +2,7 @@
 # DADA2/Bioconductor pipeline for big data, modified
 # part 2, create sequence tables
 #
-# bigdata_part1_v8_0824_ITS
+# bigdata_part1_v8_3_1024_ITS
 ################################################################################
 
 # This script is designed to process large studies using the
@@ -372,10 +372,18 @@ if(use_accn_list) {
 
 if(use_accn_list) samdf <- dplyr::filter(samdf, Run %in% sample.names)
 
-if(all(sample.names %in% samdf$Run)){
-  cat("\nsamples in fastq files match samples in metadata\n")
+if(data_type == "sra") {
+  if(all(rownames(seqtab.nochim) %in% samdf$Run)){
+    cat("\nsamples in sequence table match samples in metadata\n")
+  } else {
+    cat("\nWARNING samples in sequence table DO NOT match samples in metadata\n")
+  }
 } else {
-  cat("\nWARNING samples in fastq files DO NOT match samples in metadata\n")
+  if(all(rownames(seqtab.nochim) %in% samdf$Library_Name)){
+    cat("\nsamples in sequence table match samples in metadata\n")
+  } else {
+    cat("\nWARNING samples in sequence table DO NOT match samples in metadata\n")
+  }
 }
 
 # handling primers --------------------------------------------------------
@@ -834,9 +842,11 @@ for(sam in sample.names) {
   derepF <- derepFastq(filtFs[[sample_index_F]])
   ddF <- dada(derepF, err=errF, multithread=TRUE)
   denoised[sample_index_F] <- getN(ddF)
-  sample_index_R <- which(str_detect(filtRs, sam))
-  derepR <- derepFastq(filtRs[[sample_index_R]])
-  ddR <- dada(derepR, err=errR, multithread=TRUE)
+  if(paired_end){
+    sample_index_R <- which(str_detect(filtRs, sam))
+    derepR <- derepFastq(filtRs[[sample_index_R]])
+    ddR <- dada(derepR, err=errR, multithread=TRUE)
+  }
   if(!paired_end | merge_option == "fwd"){
     merger <- dadaFs
   } else {
@@ -870,8 +880,9 @@ lapply(mergers, class)
 if(play_audio) beep(sound = sound_n)
 if(keep_time) toc()
 
-rm(derepF); rm(derepR)
-
+rm(derepF)
+if(paired_end) rm(derepR)
+gc()
 
 # Build sequence table  -----------------------------------------------
 # remove if the object is NULL
