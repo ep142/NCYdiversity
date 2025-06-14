@@ -1,4 +1,4 @@
-# DADA2/Bioconductor pipeline for 18S/26S, modified, v0_3, 03/2025
+# DADA2/Bioconductor pipeline for 18S/26S, modified, v0_4, 04/2025
 
 #  Description & instructions ---------------------------------------------
 
@@ -1081,49 +1081,7 @@ if(use_cutadapt){
 if (play_audio) beep(sound = sound_n)
 
 
-# fixing bad taxa ---------------------------------------------------------
 
-# first fix taxa with ambiguous labels or potential duplicate labels
-
-# fix Incertae sedis (for Ruminococcaceae and Lachnospiraceae)
-
-pos_to_change <- which(taxtab2$Genus == "Incertae Sedis")
-if(length(pos_to_change)>0){
-  cat("\nfixing Incertae Sedis in genera")
-  taxtab2$Genus[pos_to_change] <- paste(taxtab2$Family[pos_to_change], taxtab2$Genus[pos_to_change], sep = " ")
-  taxtab2$s_label[pos_to_change] <- taxtab2$Genus[pos_to_change] }
-# fix "Unknown Family"
-pos_to_change <- which((taxtab2$Family == "Unknown Family") & (taxtab2$Genus == ""))
-if(length(pos_to_change)>0){
-  cat("\nfixing Unknown family")
-  taxtab2$Family[pos_to_change] <- paste(taxtab2$Order[pos_to_change], taxtab2$Family[pos_to_change], sep = " ")
-  taxtab2$s_label[pos_to_change] <- taxtab2$Family[pos_to_change] 
-}
-# fix s_label == uncultured
-pos_to_change <- which(taxtab2$s_label == "uncultured" & taxtab2$Class == "uncultured")
-if(length(pos_to_change)>0){
-  cat("\nfixing uncultured in Class")
-  taxtab2$Class[pos_to_change] <- paste("uncultured", taxtab2$Phylum[pos_to_change], sep = " ")
-  taxtab2$s_label[pos_to_change] <- taxtab2$Class[pos_to_change] 
-}
-pos_to_change <- which(taxtab2$s_label == "uncultured" & taxtab2$Order == "uncultured")
-if(length(pos_to_change)>0){
-  cat("\nfixing uncultured in Order")
-  taxtab2$Order[pos_to_change] <- paste("uncultured", taxtab2$Class[pos_to_change], sep = " ")
-  taxtab2$s_label[pos_to_change] <- taxtab2$Order[pos_to_change] 
-}
-pos_to_change <- which(taxtab2$s_label == "uncultured" & taxtab2$Family == "uncultured")
-if(length(pos_to_change)>0){
-  cat("\nfixing uncultured in Family")
-  taxtab2$Family[pos_to_change] <- paste("uncultured", taxtab2$Order[pos_to_change], sep = " ")
-  taxtab2$s_label[pos_to_change] <- taxtab2$Family[pos_to_change] 
-}
-pos_to_change <- which(taxtab2$s_label == "uncultured" & taxtab2$Genus == "uncultured")
-if(length(pos_to_change)>0){
-  cat("\nfixing uncultured in Genus")
-  taxtab2$Genus[pos_to_change] <- paste("uncultured", taxtab2$Family[pos_to_change], sep = " ")
-  taxtab2$s_label[pos_to_change] <- taxtab2$Genus[pos_to_change] 
-}
 
 # remove bad ides ----------------------------------------
 # which is the proportion of sequences with Kingdom only?
@@ -1278,16 +1236,24 @@ save.image(file = str_c(Study,"_small.Rdata"))
 # samples -----------------------------------------------------------------
 # loads the phyloseq object if it does not exist
 if (!exists("myphseq")) {myphseq <- readRDS(str_c("data/", Study, "_ps.rds", sep = ""))}
+remove_Oryza_Basidiomycota <- T
+if(remove_Oryza_Basidiomycota){
+  # s_label Basidiomycota
+  # s_label Oryza
+  # prune these two
+  rank_names(myphseq)
+  myphseq_2 <- myphseq |> subset_taxa(Genus != "Oryza")
+  ntaxa(myphseq)
+  ntaxa(myphseq_2)
+  myphseq_2 <- myphseq_2 |> subset_taxa(Genus != "Basidiomycota")
+  ntaxa(myphseq)
+  ntaxa(myphseq_2)
+  myphseq <- myphseq_2
+  # save the physeq
+  saveRDS(myphseq,str_c("data/", Study, "_ps.rds"))
+}
 
-# s_label Basidiomycota
-# s_label Oryza
-# prune these two
-rank_names(myphseq)
-myphseq_2 <- myphseq |> subset_taxa(Genus != "Oryza")
-ntaxa(myphseq)
-ntaxa(myphseq_2)
-myphseq_2 <- myphseq_2 |> subset_taxa(Genus != "Basidiomycota")
-myphseq <- myphseq_2
+
 # prep the sample table
 # extract the sample data to a data frame
 samples <- as(sample_data(myphseq_2), "data.frame")
@@ -1371,29 +1337,25 @@ write_tsv(samples, str_c(Study,"_samples.txt"))
 
 
 # extract unique taxa -----------------------------------------------------
+# first, make sure that the ASVs match
+ASVs_in_physeq <- taxa_names(myphseq)
+taxtab2 <- taxtab2 |>
+  dplyr::filter(ASV %in% ASVs_in_physeq)
 
 # a tibble with unique elements for taxonomy
-# some changes are necessary for coherence with FMBN taxonomy
-taxtab2 <- taxtab2 |> 
-  mutate(Genus = if_else(Family =="Pleosporales_Incertae_Sedis", Family, Genus)) |>
-  mutate(s_label = if_else(s_label == "Pleosporales" & Family == "", "Pleosporales_order", s_label)) |> 
-  mutate(s_label = if_else(Family =="Capnodiales_Incertae_Sedis" & Genus == "Chaetothyriales", "Capnodiales_Incertae_Sedis", s_label))
-unique_tax <- taxtab2 %>% select(-ASV) |> distinct()
+
+unique_tax <- taxtab2 |> select(-ASV) |> distinct()
 # check for duplicates
 any(duplicated(unique_tax$s_label))
 which(duplicated(unique_tax$s_label))
 # fix it
+
 
 # if the tax database is silva v138 class changes are not needed
 
 if(!str_detect(study$tax_database, "v138")) {
   taxa <- unique_tax %>%
     mutate(sp_label = ifelse(Species!="",str_c(Genus, Species),"")) %>%
-    mutate(Class = ifelse(Class == "Acidomicrobia", "Acidomicrobiia", Class)) %>%
-    mutate(Class = ifelse(Class == "Coriobacteria", "Coriobacteriia", Class)) %>%
-    mutate(Class = ifelse(Class == "Flavobacteria", "Flavobacteriia", Class)) %>%
-    mutate(Class = ifelse(Class == "Sphingobacteria", "Sphingobacteriia", Class)) %>%
-    mutate(Class = ifelse(Class == "Fusobacteria", "Fusobacteriia", Class)) %>%
     mutate(id = ifelse(Kingdom =="", "Root;k__;c__;f__;g__;s__",
                        str_c("Root;k__", Kingdom, "__", Phylum, ";c__", 
                              Class, ";f__", Family, ";g__", Genus, ";s__", sp_label)),
@@ -1409,16 +1371,6 @@ if(!str_detect(study$tax_database, "v138")) {
                                "; s__", sp_label)) %>%
     mutate(Species = sp_label) %>%
     select(id, label = s_label, Kingdom:Species, taxonomy, id_L6, taxonomy_L6)
-  
-  # found a bug, need to fix labels for some taxa
-  taxa <- taxa %>% mutate(label = case_when(
-    Class == "Acidobacteria (class)" & label == "Acidobacteria" ~ "Acidobacteria (class)",
-    TRUE ~ label
-  ))
-  taxtab2 <- taxtab2 %>% mutate(s_label = case_when(
-    Class == "Acidobacteria (class)" & s_label == "Acidobacteria" ~ "Acidobacteria (class)",
-    TRUE ~ s_label
-  ))
 } else {
   taxa <- unique_tax %>%
     mutate(Genus = ifelse(Genus == "Incertae_sedis", str_c(Family, Genus, sep = "_"), Genus)) %>%
@@ -1446,8 +1398,10 @@ write_tsv(taxa, str_c(Study, "taxaFMBN.txt"))
 # prepare OTU and edge tables ---------------------------------------------
 
 # merge taxonomy into sequence table
-seqtab2 <- as_tibble(rownames_to_column(as.data.frame(otu_table(myphseq)), "ASV"))
-seqtab2 <- dplyr::full_join(select(taxtab2, ASV, s_label), seqtab2) %>%
+seqtab2 <- as(otu_table(myphseq), "matrix") |>
+  as.data.frame() |>
+  rownames_to_column("ASV")
+seqtab2 <- dplyr::left_join(select(taxtab2, ASV, s_label), seqtab2) |>
   select(-ASV) 
 
 
@@ -1459,14 +1413,14 @@ seqtab_lg <- dplyr::full_join(seqtab_l, unique_tax) %>%
   mutate(g_label = ifelse(Genus == "", s_label, Genus)) 
 
 #the edge table
-edge_table <- seqtab_lg %>% 
-  group_by(variable, s_label) %>%
-  dplyr::summarise(seq_sums = sum(value)) %>%
-  dplyr::rename(Run_s = variable) %>%
-  ungroup() %>%
-  group_by(Run_s) %>%
-  mutate(weight = 100*seq_sums/sum(seq_sums)) %>%
-  dplyr::filter(weight>0) %>%
+edge_table <- seqtab_lg |> 
+  group_by(variable, s_label) |>
+  dplyr::summarise(seq_sums = sum(value, na.rm = T)) |>
+  dplyr::rename(Run_s = variable) |>
+  ungroup() |>
+  group_by(Run_s) |>
+  mutate(weight = 100*seq_sums/sum(seq_sums)) |>
+  dplyr::filter(weight>0) |>
   ungroup()
 
 # get sums at the species level and pivot wider, absolute frequencies

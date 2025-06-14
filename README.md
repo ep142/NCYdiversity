@@ -12,7 +12,10 @@ My scripts and data for the NCYdiversity (Non-Conventional Yeast diversity) proj
   
   + [LSU training sets, beta version](https://zenodo.org/records/15044501)  
   
-* sanity_check_26S.R: a script for checking the quality of taxonomic assignments obtained with the LSU trainsets    
+* sanity_check_26S.R: a script for checking the quality of taxonomic assignments obtained with the LSU trainsets   
+
+* make_taxo_UNITE.R a small service script designed to create a data frame from UNITE general release train set 
+(here sh_general_release_dynamic_s_04.04.2024.fasta) the data frame, in turn, can be used as a lookup table to align taxonomies from SILVA to those in UNITE
 
 * primer_pairs_fungi.txt a service table containing most frequently used primer pairs for ITS amplification, work in progress  
 
