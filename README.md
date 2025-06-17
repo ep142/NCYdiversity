@@ -27,7 +27,7 @@ My scripts and data for the NCYdiversity (Non-Conventional Yeast diversity) proj
   
   + run the bigdata_part2 script to merge the sequence tables, do taxonomy assignment, infer phylogenetic tree, assemble a phyloseq object and produce files for imponrt in FoodMicrobionet  
   
-* FMBN5_0_1 a folder containing R lists for FoodMicrobionet, table specifications and summary statistics
+* FMBN5_1_1 a folder containing R lists for FoodMicrobionet, table specifications and summary statistics
 
 ## Acknowledgements.  
 
