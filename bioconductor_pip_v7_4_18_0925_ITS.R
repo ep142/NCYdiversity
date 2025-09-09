@@ -1,4 +1,4 @@
-# DADA2/Bioconductor pipeline for ITS, modified, v7.4.17, 15/11/24
+# DADA2/Bioconductor pipeline for ITS, modified, v7.4.18, 08/09/2025
 
 #  Description & instructions ---------------------------------------------
 
