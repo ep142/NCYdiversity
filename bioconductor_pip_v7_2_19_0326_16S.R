@@ -1,4 +1,4 @@
-# DADA2/Bioconductor pipeline for 18S/26S, modified, v0_4, 04/2025
+# DADA2/Bioconductor pipeline for 16S, modified, v7_2_19, 03/26
 
 #  Description & instructions ---------------------------------------------
 
@@ -14,10 +14,7 @@
 # single end/paired end data sets obtained with Illumina or 454 or Ion Torrent
 # In addition it includes a workaround for quality binned fastq described here:
 # https://github.com/benjjneb/dada2/issues/791
-
-# custom taxonomic references were prepared from SILVA v132_2 LSU and SSU databases
-# they are currently (05/03/25) in beta version
-
+# SILVA v138.2 is used as a taxonomic reference data base
 # Finally, the script assembles an object which can be used in the future for
 # redoing the taxonomic assignment in an automated way
 
@@ -108,8 +105,10 @@ use_primer_table <- T # uses a primer table to check if the primer sequences are
 # put the location of your primer table inside this if (if you want to go
 # two levels above use ".." twice in file.path())
 if(use_primer_table){
-  primer_table_path <- file.path("..", "primer_pairs_fungi.txt")
+  primer_table_path <- file.path("..", "primer_pairs_bacteria.txt")
 }
+# the number of sequences below which a sample will be dropped from the study
+min_seq <- 1000
 
 #  functions --------------------------------------------------------------
 
@@ -184,12 +183,12 @@ data_type <- "sra"
 # when using data other than those downloaded from SRA replace
 # the accession number with whichever identifier you want to use
 
-Study <- "SRP311206" # PRJNA704571 
-target <- "26S RNA gene and 16S RNA gene" # alternatives are 16S RNA, 16S RNA gene, 18S RNA gene and 
-# if ITS analysis was performed for the same study ITS and 16S RNA gene
-region <- "D1-D2 and V3-V4" # or ITSx and Vx
+Study <- "ERP171318" # PRJEB88181 
+target <- "16S RNA gene" # alternatives are 16S RNA, 16S RNA gene and 
+# if ITS analysys was performed for the same study ITS and 16S RNA gene
+region <- "V4" # or ITSx and Vx
 seq_accn <- Study
-DOI <- "10.3389/fmicb.2021.776862"
+DOI <- "10.1128/aem.00526-25"
 
 # information on the platform and arrangement
 
@@ -198,26 +197,43 @@ platform <- "Illumina_miseq" #  (or set to "Illumina_miseq", "Illumina_novaseq",
 paired_end <- T # set to true for paired end, false for single end or in the case of clean, merged seqs
 if (!paired_end) overlapping <- T # needed to run species assignment for SILVA
 
-# Primers 18S: --------------------------------------------
-# V4_1f CCAGCASCYGCGGTAATWCC and TAReukREV ACTTTCGTTCTTGATYRA
-# V5-V6 SU0817F TTAGCATGGAATAATRRAATAGGA  1196R TCTGGACCTGGTGAGTTTCC
-# V9 1380F	CCCTGCCHTTTGTACACAC	1510R	CCTTCYGCAGGTTCACCTAC
+# Primers: --------------------------------------------
 
+# V1-V3 
+# Gray28F (5′-TTTGATCNTGGCTCAG) 16 bp and Gray519r (5′-GTNTTACNGCGGCKGCTG) 18 bp, 509 bp
+# 27F 5′ AGAGTTTGATCMTGGCTCAG3’ — 519R 5′ GWATTACCGCGGCKGCTG3′
+# 
+# V3-V4
+# S-D-Bact-0341-b-S-17/S-d-Bact-0785-a-A-21 primer pair with an amplicon size of 464 bp (Klindworth et al., 2012; 
+# also known as Bakt_341F/Bakt_805R primer pair designed by Sinclair et al. (2015)
+# forward CCTACGGGNGGCWGCAG 17 bp 
+# reverse GACTACHVGGGTATCTAATCC 21 bp
+# Uni340F (5′ CCTACGGGRBGCASCAG-3′) 17 bp and Bac806R (5′GGACTACYVGGGTATCTAAT 3′) 20 bp
+# 357 F (5’-CTCCTACGGGAGGCAGCAG-3’) 19 bp and 939R (5’-CTTGTGCGGGCCCCCGTCAATTC-3’) 23 bp - 605 bp
+# F341	(ACTCCTACGGGRSGCAGCAG) 20 bp and	R806	(GGACTACVVGGGTATCTAATC) 21 bp
+# Bakt_341F_Nov CCTAYGGGRBGCASCAG 17 bp, Bakt_805R_Nov GGACTACNNGGGTATCTAAT 20 bp (primers used by Novogene)
+#
+# V4
+# 515F (5'- GTGCCAGCMGCCGCGGTAA-3' ) 19 bp and 806R (5' -GGACTACHVGGGTWTCTAAT-3’) 20 bp length  311 bp
+# 515 F (5′- GTGBCAGCMGCCGCGGTAA - 3′) (Hugerth et al., 2014) and Pro--mod-805 R (5′-GACTACNVGGGTMTCTAATCC - 3′) 21 bp length 310 bp
+#
+# V4-V5 (515F, 5′-GTGCCAGCMGCCGCGGTAA-3′ 19 bp; 926R, 5′-CCGTCAATTCMTTTRAGT-3′  18 bp 429 bp)
+# 515F_3 (5'-GTGNCAGCMGCCGCGGTAA) 19 bp; 907R, (5'-CCGYCAATTYMTTTRAGTTT-3') 20 bp 412 bp
 
-# Primers 26S: --------------------------------------------
-# D1 NL4R (5′-GGTCCGTGTTTCAAGACGG-3′) and LS2-MF (5′-GAGTCGAGTTGTTTGGGAAT-3′), as described by Mota-Gutierrez et al., 2019
+# Primers: --------------------------------------------
+  
 
 # expected amplicon length 469 including primers
-primer_f <- "NL4R" # 
-primer_r <- "LS2-MF"  # 
+primer_f <- "515F" # 
+primer_r <- "806R"  # 
 
 # NOTE: be extra careful in indicating primer sequences because this will affect
 # primer detection and primer removal by cutadapt
 
-FWD <- "GGTCCGTGTTTCAAGACGG"  ## CHANGE THIS to your forward primer sequence
-REV <- "GAGTCGAGTTGTTTGGGAAT"   ## CHANGE THIS to your reverse primer sequence
+FWD <- "GTGCCAGCMGCCGCGGTAAG"  ## CHANGE THIS to your forward primer sequence
+REV <- "GGACTACHVGGGTWTCTAAT"   ## CHANGE THIS to your reverse primer sequence
 
-target1 <- "26S_DNA" # or 16S_RNA
+target1 <- "16S_DNA" # or 16S_RNA
 target2 <- region # or if the region is ITSx + Vx specify only the bacterial target region
 
 # if you have set correctly your options this should not return any warning
@@ -298,7 +314,7 @@ if(data_type == "novogene_raw"){
 # early check for sequences and metadata --------------------------------
 
 # path to the metadata file (needs to be adapted)
-metadata_path <- file.path("data", "metadata", "SraRunInfo.csv") 
+metadata_path <- file.path("data", "metadata", "SraRunTable.csv") 
 # alternatives when using data downloades from NCBI SRA are:
 # "data/metadata/SraRunInfo.txt" 
 # "data/metadata/SraRunTable.txt.csv"
@@ -593,7 +609,6 @@ if(play_audio) beep(sound = sound_n)
 
 # filtering and trimming --------------------------------------------------
 
-
 # creates directory data/filtered if it does not exist
 if(!file_test("-d", filt_path)) dir.create(filt_path)
 # creates file paths for filtered sequences
@@ -607,9 +622,9 @@ if(paired_end) filtRs <- file.path(filt_path, basename(fnRs))
 # quality score 30 1 error in 100, 40 1 in 10000, 20 1 in 100
 # Novogene "clean" sequences are merged and quality processed, with primers removed
 # reverse not applicable here: in some cases it is better to remove a few nt from the end
-truncf<- 240
-truncr<- 220 # NULL if not paired end
-trim_left <- c(20,20) # use a length 2 vector c(x,y) if paired end or a single number if not
+truncf<- 200
+truncr<- 200 # NULL if not paired end
+trim_left <- c(0,0) # use a length 2 vector c(x,y) if paired end or a single number if not
 if(platform == "Ion_Torrent") trim_left <- trim_left+15
 maxEEf = 2 # with very high quality data can be reduced to 1
 maxEEr = 5 # 2 very restrictive, 5 does well in most cases, not needed for single end
@@ -691,6 +706,58 @@ cat("After filtering there are between ",
     ")\n",
     sep=""
     )
+
+
+# remove any sample with less than min_seq
+
+samples_to_keep <- out[, 2] > min_seq
+filtFs <- filtFs[samples_to_keep]
+if (paired_end){filtRs <- filtRs[samples_to_keep]}
+
+
+# check that files exist
+if (!all(file.exists(filtFs))) {
+  filtFs <- filtFs[file.exists(filtFs)]
+}
+
+if (paired_end) {
+  if (!all(file.exists(filtRs))) {
+    filtRs <- filtRs[file.exists(filtRs)]
+  }
+}
+
+if(length(filtFs)<length(fnFs)){
+  # fix samdf
+  sample.names.f <- dplyr::case_when(
+    all(str_detect(basename(filtFs), "_")) ~ sapply(strsplit(basename(filtFs), "_", fixed = T), `[`, 1),
+    all(str_detect(basename(filtFs), ".")) ~ sapply(strsplit(basename(filtFs), ".", fixed = T), `[`, 1),
+  )
+  # ad hoc
+  if (data_type == "novogene_rawa") {
+    sample.names.f <- str_remove(sample.names, "\\.raw")
+  }
+  samdf <- samdf |>
+    dplyr::filter(Run %in% sample.names.f)
+  sample.names <- sample.names.f
+}
+
+cat(
+  red(
+    "\nAfter removing samples with less than",
+    min_seq,
+    "sequences post quality filtering, there are ",
+    length(filtFs),
+    "out of",
+    dim(out)[1],
+    "samples left.\n"
+  )
+)
+
+# fix out if needed
+if(length(filtFs)<dim(out)[1]){
+  out <- out[basename(filtFs),]
+}
+
 
 
 # learning error rates ----------------------------------------------------
@@ -855,9 +922,11 @@ if(keep_time) toc()
 
 # filter by size ----------------------------------------------------------
 
-# to remove sequences much shorter or longer than expected. Needs to be inspected.
+# to remove sequences much shorter or longer than expected (approx 420-430 for 
+# V3-V4, 268-262 for V4, 388-392 for V4-V5 and 470-475 for V1-V3; shorter 
+# sequences are usually mitochondria). Needs to be inspected.
 
-seqtab_f <- seqtab.all[,nchar(colnames(seqtab.all)) %in% seq(320,373)]
+seqtab_f <- seqtab.all[,nchar(colnames(seqtab.all)) %in% seq(250,296)]
 
 filt_seqs <- sum(seqtab_f)/sum(seqtab.all) 
 
@@ -980,12 +1049,8 @@ list.files(taxdb_dir)
 # assignment with SILVA
 RC <- F # false by default
 
-# using SILVA
-if(str_detect(target, "18S")){
-  ref_fasta <- file.path(taxdb_dir, "SILVA_SSUfungi_nr99_v138_2_toGenus_trainset.fasta")
-} else {
-  ref_fasta <- file.path(taxdb_dir, "SILVA_LSUfungi_nr99_v138_2_toGenus_trainset.fasta")
-}
+# SILVA
+ref_fasta <- file.path(taxdb_dir, "silva_nr99_v138.2_toGenus_trainset.fa")
 taxtab <- assignTaxonomy(seqtab.nochim, refFasta = ref_fasta, multithread = TRUE)
 # setting tryRC to T if there are too many sequences not identified at the phylum level
 if(mean(is.na(taxtab[,2]))>0.2) {
@@ -997,17 +1062,11 @@ if(mean(is.na(taxtab[,2]))>0.2) {
 # which also tries the reverse complement
 if(keep_time) toc()
 
-
 # do species assignment, DOES NOT WORK WITH JUST CONCATENATE
 
 if(!paired_end | overlapping){
   if(keep_time) tic("\nassign taxonomy, species")
-  if(str_detect(target, "18S")){
-    assign_species_ref <- "SILVA_SSUfungi_assignSpecies.fasta"
-  } else {
-    assign_species_ref <- "SILVA_LSUfungi_assignSpecies.fasta"
-  }
-  sp_ass_SILVA <- file.path(taxdb_dir, assign_species_ref)
+  sp_ass_SILVA <- file.path(taxdb_dir, "silva_v138.2_assignSpecies.fa")
   taxtab <- addSpecies(taxtab, sp_ass_SILVA, tryRC = RC)
   # optionally, if the sequences do not get identified, add the option tryRC=T
   # which also tries the reverse complement
@@ -1081,23 +1140,93 @@ if(use_cutadapt){
 if (play_audio) beep(sound = sound_n)
 
 
+# fixing bad taxa ---------------------------------------------------------
 
+# first fix taxa with ambiguous labels or potential duplicate labels
 
-# remove bad ides ----------------------------------------
+# first fix taxa with ambiguous labels or potential duplicate labels
+taxtab2 <- taxtab2 |>
+  mutate(s_label = if_else(s_label == "endosymbionts", 
+                           str_c(Family, s_label),
+                           s_label))
+
+# fix Incertae sedis (for Ruminococcaceae and Lachnospiraceae)
+
+pos_to_change <- which(taxtab2$Genus == "Incertae Sedis")
+if(length(pos_to_change)>0){
+  cat("\nfixing Incertae Sedis in genera")
+  taxtab2$Genus[pos_to_change] <- paste(taxtab2$Family[pos_to_change], taxtab2$Genus[pos_to_change], sep = " ")
+  taxtab2$s_label[pos_to_change] <- taxtab2$Genus[pos_to_change] }
+# fix "Unknown Family"
+pos_to_change <- which((taxtab2$Family == "Unknown Family") & (taxtab2$Genus == ""))
+if(length(pos_to_change)>0){
+  cat("\nfixing Unknown family")
+  taxtab2$Family[pos_to_change] <- paste(taxtab2$Order[pos_to_change], taxtab2$Family[pos_to_change], sep = " ")
+  taxtab2$s_label[pos_to_change] <- taxtab2$Family[pos_to_change] 
+}
+# fix s_label == uncultured
+pos_to_change <- which(taxtab2$s_label == "uncultured" & taxtab2$Class == "uncultured")
+if(length(pos_to_change)>0){
+  cat("\nfixing uncultured in Class")
+  taxtab2$Class[pos_to_change] <- paste("uncultured", taxtab2$Phylum[pos_to_change], sep = " ")
+  taxtab2$s_label[pos_to_change] <- taxtab2$Class[pos_to_change] 
+}
+pos_to_change <- which(taxtab2$s_label == "uncultured" & taxtab2$Order == "uncultured")
+if(length(pos_to_change)>0){
+  cat("\nfixing uncultured in Order")
+  taxtab2$Order[pos_to_change] <- paste("uncultured", taxtab2$Class[pos_to_change], sep = " ")
+  taxtab2$s_label[pos_to_change] <- taxtab2$Order[pos_to_change] 
+}
+pos_to_change <- which(taxtab2$s_label == "uncultured" & taxtab2$Family == "uncultured")
+if(length(pos_to_change)>0){
+  cat("\nfixing uncultured in Family")
+  taxtab2$Family[pos_to_change] <- paste("uncultured", taxtab2$Order[pos_to_change], sep = " ")
+  taxtab2$s_label[pos_to_change] <- taxtab2$Family[pos_to_change] 
+}
+pos_to_change <- which(taxtab2$s_label == "uncultured" & taxtab2$Genus == "uncultured")
+if(length(pos_to_change)>0){
+  cat("\nfixing uncultured in Genus")
+  taxtab2$Genus[pos_to_change] <- paste("uncultured", taxtab2$Family[pos_to_change], sep = " ")
+  taxtab2$s_label[pos_to_change] <- taxtab2$Genus[pos_to_change] 
+}
+
+# do further fixes using a lookup table
+bad_taxa <- read_tsv(file.path("..","tax_db","SILVA_bad-taxa.txt"))
+
+if(any(pull(taxtab2, s_label) %in% pull(bad_taxa, s_label))){
+  cat("\nfixing bad taxa using lookup table")
+  colnames(bad_taxa) <- c("s_label", "new_kingdom", "new_phylum", "new_class", 
+                          "new_order", "new_family", "new_genus", "new_species")
+  taxtab2 <- left_join(taxtab2, bad_taxa)
+  taxtab2 <- taxtab2 %>%
+    mutate(Genus = ifelse(is.na(new_genus), Genus, new_genus),
+           Family = ifelse(is.na(new_family), Family, new_family),
+           Order = ifelse(is.na(new_order), Order, new_order),
+           Class = ifelse(is.na(new_class), Class, new_class),
+    ) %>%
+    select(-(new_kingdom:new_species))
+}
+
+# remove bad ides and mitochondria / chloroplasts ----------------------------------------
 # which is the proportion of sequences with Kingdom only?
 nASVs <- nrow(taxtab2)
 nkingdom <- taxtab2 %>% dplyr::filter(Phylum == "") %>% nrow()
 f_nkingdom <-  nkingdom/nASVs
+# which is the proportion of ASVs attrobuted to mitochondria?
+nmito <- taxtab2 %>% dplyr::filter(Family == "Mitochondria") %>% nrow() 
+f_nmito <-  nmito/nASVs
 # quite low no need to filter
 filter_ASVs <- T
 if(filter_ASVs){
   taxtab2_old <- taxtab2
   seqtab.nochim_old <- seqtab.nochim
   taxtab2 <- taxtab2 %>%
-    dplyr::filter(Phylum != "") 
+    dplyr::filter(Phylum != "") %>%
+    dplyr::filter(Family != "Mitochondria") |>
+    dplyr::filter(Order != "Chloroplast") 
   seqtab.nochim <- seqtab.nochim[,(colnames(seqtab.nochim) %in% taxtab2$ASV)]
 }
-# the fraction of poorly identified taxa is high checked they are bacteria
+
 
 # Build phylogenetic tree ---------------------------------------------
 
@@ -1108,10 +1237,15 @@ if(filter_ASVs){
 # but it is already prohibitive with 20k
 # and usually not worth the effort
 
-dotree <- T # avoid if overlapping == F
+dotree <- F # avoid if overlapping == F
 if(dim(seqtab.nochim)[2]>10000 | overlapping == F) {dotree <- F}
 
 if (dotree) {
+  # I am limiting the phylogenetic tree generation fo 2500-5000 ASVs, otherwise a NJtree is generated
+  
+  ave_seq_length <- mean(nchar(rownames(taxtab)))
+  max_seqs <- 5000
+  if(ave_seq_length >250) max_seqs <- round(max_seqs/2,0)
   if(keep_time) tic("\nbuilding the phylogenetic tree")
   seqs <-
     dada2::getSequences(seqtab.nochim) # the collapse option is very interesting
@@ -1133,22 +1267,31 @@ if (dotree) {
   # perform Neighbor joining
   cat("creating tree...","\n")
   treeNJ <- phangorn::NJ(dm) # Note, tip order != sequence order
-  # internal maximum likelihood for tree
-  #cat("estimating internal ML for tree...", "\n)
-  fit = phangorn::pml(treeNJ, data = phang.align)
-  Sys.sleep(5)
-  fitGTR <- update(fit, k = 4, inv = 0.2)
-  Sys.sleep(5)
-  # this is the step taking the longest time
-  cat("Optimization, please be patient (with >1000 seqs you are better off doing this overnight)...","\n")
-  fitGTR <- optim.pml(
-    fitGTR,
-    model = "GTR",
-    optInv = TRUE,
-    optGamma = TRUE,
-    rearrangement = "stochastic",
-    control = pml.control(trace = 0)
-  )
+  
+  if(length(seqs)<=max_seqs){
+    # internal maximum likelihood for tree
+    fit = phangorn::pml(treeNJ, data = phang.align)
+    Sys.sleep(5)
+    fitGTR <- update(fit, k = 4, inv = 0.2)
+    Sys.sleep(5)
+    # this is the step taking the longest time
+    # skip the optimization if more than max_seq
+    
+    cat("Optimization, please be patient (with >1000 seqs you are better off doing this overnight)...","\n")
+    fitGTR <- optim.pml(
+      fitGTR,
+      model = "GTR",
+      optInv = TRUE,
+      optGamma = TRUE,
+      rearrangement = "stochastic",
+      control = pml.control(trace = 0)
+    )
+    my_tree <- fitGTR$tree
+  } else {
+    treeNJ <- midpoint(treeNJ)
+    treeNJ$edge.length[treeNJ$edge.length < 0] <- 0
+    my_tree <- treeNJ  
+  }
   detach("package:phangorn", unload = TRUE)
   if(keep_time) toc()
 }
@@ -1212,10 +1355,10 @@ if(data_type == "sra"){
 seqtab_t = t(seqtab.nochim)
 
 # combine in a phyloseq object
-if(exists("fitGTR", mode = "list")){
+if(exists("my_tree")){
   myphseq <- phyloseq(tax_table(taxtab), sample_data(samdf),
                       otu_table(seqtab_t, taxa_are_rows = TRUE),
-                      phy_tree(fitGTR$tree))
+                      phy_tree(my_tree))
 } else {
   myphseq <- phyloseq(tax_table(taxtab), sample_data(samdf),
                       otu_table(seqtab_t, taxa_are_rows = TRUE))}
@@ -1236,27 +1379,10 @@ save.image(file = str_c(Study,"_small.Rdata"))
 # samples -----------------------------------------------------------------
 # loads the phyloseq object if it does not exist
 if (!exists("myphseq")) {myphseq <- readRDS(str_c("data/", Study, "_ps.rds", sep = ""))}
-remove_Oryza_Basidiomycota <- T
-if(remove_Oryza_Basidiomycota){
-  # s_label Basidiomycota
-  # s_label Oryza
-  # prune these two
-  rank_names(myphseq)
-  myphseq_2 <- myphseq |> subset_taxa(Genus != "Oryza")
-  ntaxa(myphseq)
-  ntaxa(myphseq_2)
-  myphseq_2 <- myphseq_2 |> subset_taxa(Genus != "Basidiomycota")
-  ntaxa(myphseq)
-  ntaxa(myphseq_2)
-  myphseq <- myphseq_2
-  # save the physeq
-  saveRDS(myphseq,str_c("data/", Study, "_ps.rds"))
-}
-
 
 # prep the sample table
 # extract the sample data to a data frame
-samples <- as(sample_data(myphseq_2), "data.frame")
+samples <- as(sample_data(myphseq), "data.frame")
 # extract the tax table to a matrix (however, I will be using taxtab2)
 ttab <- as(tax_table(myphseq), "matrix")
 ##############################
@@ -1284,7 +1410,7 @@ loc_list <- ifelse("geo_loc_name_country" %in% colnames(samples),
 # put together and save study info
 study <- tibble(target = target, region = region, platform = instrument,
                 read_length_bp = read_length, seq_center = seq_center,
-                tax_database = "SILVA v138_1", Seq_accn = seq_accn,
+                tax_database = "SILVA v138_2", Seq_accn = seq_accn,
                 samples = n_samples, DOI = DOI, geoloc = loc_list, 
                 primer_f, primer_r, overlapping, paired_end)
 # saves study info
@@ -1297,16 +1423,16 @@ write_tsv(study, str_c(Study,"_study.txt"))
 # check naming of the geoloc info
 
 samples <- samples %>%
-  mutate(description = str_c("Robiola", SampleName, sep =", "))
+  mutate(description = str_c("black olives from Greece", Sample.Name, sep =", "))
 if(data_type == "sra"){
   samples <- samples %>%
-    mutate(Sample_Name = SampleName) } # either this or library name, useful for matching fungi and bacteria
+    mutate(Sample_Name = Sample.Name) } # either this or library name, useful for matching fungi and bacteria
 
 # information of geoloc (and names of the field) is very inconsistent:
 # check the info in your sample metadata and adatp these commands
 # use these if part or all of the geolocation information is missing
-samples$geo_loc_name_country <- "Italy"
-samples$geo_loc_name_country_continent <- "Europe"
+# samples$geo_loc_name_country <- "France"
+# samples$geo_loc_name_country_continent <- "Europe"
 samples$lat_lon <- NA_character_
 
 
@@ -1315,7 +1441,7 @@ samples$lat_lon <- NA_character_
 # needs to be adjusted ad hoc
 if(data_type == "sra"){
   samples <- samples %>%
-    mutate(label2 = Sample_Name, target1 = target1, 
+    mutate(label2 = Sample_name, target1 = target1, 
            target2 = target2) %>%
     select(label2, n_reads2, n_issues, description, target1, target2, 
            biosample = BioSample, SRA_Sample = BioSample, SRA_run = Run, 
@@ -1331,24 +1457,28 @@ if(data_type == "sra"){
            geo_loc_continent = Continent, lat_lon, Sample_Name)
 }
 
-
 # save the sample information
 write_tsv(samples, str_c(Study,"_samples.txt"))
 
 
 # extract unique taxa -----------------------------------------------------
-# first, make sure that the ASVs match
-ASVs_in_physeq <- taxa_names(myphseq)
-taxtab2 <- taxtab2 |>
-  dplyr::filter(ASV %in% ASVs_in_physeq)
 
 # a tibble with unique elements for taxonomy
+# some changes are necessary for coherence with FMBN taxonomy
 
-unique_tax <- taxtab2 |> select(-ASV) |> distinct()
-# check for duplicates
-any(duplicated(unique_tax$s_label))
-which(duplicated(unique_tax$s_label))
-# fix it
+
+# handle a problem with UCG-001 lineage
+if("UCG-001" %in% taxtab2$s_label){
+  taxtab2 <- taxtab2 |>
+    mutate(Species = if_else(Genus == "UCG-001", str_c(Family, Genus, sep = " "), Species)) |>
+    mutate(s_label = if_else(Genus == "UCG-001", str_c(Family, Genus, sep = " "), s_label)) |>
+    mutate(Genus = if_else(Genus == "UCG-001", str_c(Family, Genus, sep = " "), Genus))
+}
+
+unique_tax <- taxtab2 %>% select(-ASV) %>% distinct()
+
+# show dupicaes if any
+if(any(duplicated(unique_tax$s_label))) unique_tax$s_label[duplicated(unique_tax$s_label)]
 
 
 # if the tax database is silva v138 class changes are not needed
@@ -1356,6 +1486,11 @@ which(duplicated(unique_tax$s_label))
 if(!str_detect(study$tax_database, "v138")) {
   taxa <- unique_tax %>%
     mutate(sp_label = ifelse(Species!="",str_c(Genus, Species),"")) %>%
+    mutate(Class = ifelse(Class == "Acidomicrobia", "Acidomicrobiia", Class)) %>%
+    mutate(Class = ifelse(Class == "Coriobacteria", "Coriobacteriia", Class)) %>%
+    mutate(Class = ifelse(Class == "Flavobacteria", "Flavobacteriia", Class)) %>%
+    mutate(Class = ifelse(Class == "Sphingobacteria", "Sphingobacteriia", Class)) %>%
+    mutate(Class = ifelse(Class == "Fusobacteria", "Fusobacteriia", Class)) %>%
     mutate(id = ifelse(Kingdom =="", "Root;k__;c__;f__;g__;s__",
                        str_c("Root;k__", Kingdom, "__", Phylum, ";c__", 
                              Class, ";f__", Family, ";g__", Genus, ";s__", sp_label)),
@@ -1371,6 +1506,16 @@ if(!str_detect(study$tax_database, "v138")) {
                                "; s__", sp_label)) %>%
     mutate(Species = sp_label) %>%
     select(id, label = s_label, Kingdom:Species, taxonomy, id_L6, taxonomy_L6)
+  
+  # found a bug, need to fix labels for some taxa
+  taxa <- taxa %>% mutate(label = case_when(
+    Class == "Acidobacteria (class)" & label == "Acidobacteria" ~ "Acidobacteria (class)",
+    TRUE ~ label
+  ))
+  taxtab2 <- taxtab2 %>% mutate(s_label = case_when(
+    Class == "Acidobacteria (class)" & s_label == "Acidobacteria" ~ "Acidobacteria (class)",
+    TRUE ~ s_label
+  ))
 } else {
   taxa <- unique_tax %>%
     mutate(Genus = ifelse(Genus == "Incertae_sedis", str_c(Family, Genus, sep = "_"), Genus)) %>%
@@ -1398,10 +1543,8 @@ write_tsv(taxa, str_c(Study, "taxaFMBN.txt"))
 # prepare OTU and edge tables ---------------------------------------------
 
 # merge taxonomy into sequence table
-seqtab2 <- as(otu_table(myphseq), "matrix") |>
-  as.data.frame() |>
-  rownames_to_column("ASV")
-seqtab2 <- dplyr::left_join(select(taxtab2, ASV, s_label), seqtab2) |>
+seqtab2 <- as_tibble(rownames_to_column(as.data.frame(otu_table(myphseq)), "ASV"))
+seqtab2 <- dplyr::full_join(select(taxtab2, ASV, s_label), seqtab2) %>%
   select(-ASV) 
 
 
@@ -1409,18 +1552,18 @@ seqtab2 <- dplyr::left_join(select(taxtab2, ASV, s_label), seqtab2) |>
 seqtab_l <- pivot_longer(seqtab2, cols = 2:ncol(seqtab2), names_to = "variable")
 
 # adds a genus label and the full taxonomy
-seqtab_lg <- dplyr::full_join(seqtab_l, unique_tax) %>% 
+seqtab_lg <- dplyr::left_join(seqtab_l, unique_tax, multiple = "first") |> 
   mutate(g_label = ifelse(Genus == "", s_label, Genus)) 
 
 #the edge table
-edge_table <- seqtab_lg |> 
-  group_by(variable, s_label) |>
-  dplyr::summarise(seq_sums = sum(value, na.rm = T)) |>
-  dplyr::rename(Run_s = variable) |>
-  ungroup() |>
-  group_by(Run_s) |>
-  mutate(weight = 100*seq_sums/sum(seq_sums)) |>
-  dplyr::filter(weight>0) |>
+edge_table <- seqtab_lg %>% 
+  group_by(variable, s_label) %>%
+  dplyr::summarise(seq_sums = sum(value)) %>%
+  dplyr::rename(Run_s = variable) %>%
+  ungroup() %>%
+  group_by(Run_s) %>%
+  mutate(weight = 100*seq_sums/sum(seq_sums)) %>%
+  dplyr::filter(weight>0) %>%
   ungroup()
 
 # get sums at the species level and pivot wider, absolute frequencies

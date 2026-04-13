@@ -373,16 +373,17 @@ if(use_accn_list) {
 if(use_accn_list) samdf <- dplyr::filter(samdf, Run %in% sample.names)
 
 if(data_type == "sra") {
-  if(all(rownames(seqtab.nochim) %in% samdf$Run)){
-    cat("\nsamples in sequence table match samples in metadata\n")
+  if(all(sample.names %in% samdf$Run)){
+    cat("\nsamples in fastq files match samples in metadata\n")
   } else {
-    cat("\nWARNING samples in sequence table DO NOT match samples in metadata\n")
+    cat("\nWARNING samples in fastq files DO NOT match samples in metadata\n")
   }
-} else {
-  if(all(rownames(seqtab.nochim) %in% samdf$Library_Name)){
-    cat("\nsamples in sequence table match samples in metadata\n")
+} else{
+  # ad hoc for your data
+  if(all(sample.names %in% samdf$Library_name)){
+    cat("\nsamples in fastq files match samples in metadata\n")
   } else {
-    cat("\nWARNING samples in sequence table DO NOT match samples in metadata\n")
+    cat("\nWARNING samples in fastq files DO NOT match samples in metadata\n")
   }
 }
 

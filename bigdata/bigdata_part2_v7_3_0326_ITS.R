@@ -2,7 +2,7 @@
 # DADA2/Bioconductor pipeline for big data, modified
 # part 3, remove chimera, assign taxonomy, save a phyloseq object, prepare files for FMBN
 #
-# bigdata_part2_v7_0724_ITS
+# bigdata_part2_v7_3_0326_ITS
 ################################################################################
 
 # This script is designed to process large studies using the
@@ -396,6 +396,12 @@ if(dim(seqtab.nochim)[2]>10000 | overlapping == F | merge_option == "mixed") {
 
 if (dotree) {
   if(keep_time) tic("\nbuilding the phylogenetic tree")
+  # I am limiting the phylogenetic tree generation fo 2500-5000 ASVs, otherwise a NJtree is generated
+  
+  ave_seq_length <- mean(nchar(rownames(taxtab)))
+  max_seqs <- 5000
+  if(ave_seq_length >250) max_seqs <- round(max_seqs/2,0)
+  
   seqs <-
     dada2::getSequences(seqtab.nochim) # the collapse option is very interesting
   names(seqs) <- seqs # This propagates to the tip labels of the tree
@@ -417,22 +423,29 @@ if (dotree) {
   cat("Performing Neighbor joining...", "\n")
   # perform Neighbor joining
   treeNJ <- phangorn::NJ(dm) # Note, tip order != sequence order
-  cat("Calculating internal maximum likelihood...", "\n")
-  # internal maximum likelihood for tree
-  fit = phangorn::pml(treeNJ, data = phang.align)
-  Sys.sleep(5)
-  fitGTR <- update(fit, k = 4, inv = 0.2)
-  Sys.sleep(5)
-  # this is the step taking the longest time
-  cat("Optimization, please be patient (with >1000 seqs you are better off doing this overnight)...","\n")
-  fitGTR <- optim.pml(
-    fitGTR,
-    model = "GTR",
-    optInv = TRUE,
-    optGamma = TRUE,
-    rearrangement = "stochastic",
-    control = pml.control(trace = 0)
-  )
+  if(length(seqs)<=max_seqs){
+    fit = phangorn::pml(treeNJ, data = phang.align)
+    Sys.sleep(5)
+    fitGTR <- update(fit, k = 4, inv = 0.2)
+    Sys.sleep(5)
+    # this is the step taking the longest time
+    # skip the optimization if more than max_seq
+    
+    cat("Optimization, please be patient (with >1000 seqs you are better off doing this overnight)...","\n")
+    fitGTR <- optim.pml(
+      fitGTR,
+      model = "GTR",
+      optInv = TRUE,
+      optGamma = TRUE,
+      rearrangement = "stochastic",
+      control = pml.control(trace = 0)
+    )
+    my_tree <- fitGTR$tree
+  } else {
+    treeNJ <- midpoint(treeNJ)
+    treeNJ$edge.length[treeNJ$edge.length < 0] <- 0
+    my_tree <- treeNJ  
+  }
   detach("package:phangorn", unload = TRUE)
   if(keep_time) toc()
 }
@@ -559,10 +572,10 @@ all(colnames(seqtab_t) == row.names(samdf_2))
 all(sort(colnames(seqtab_t)) == sort(row.names(samdf_2)))
 
 # combine in a phyloseq object
-if(exists("fitGTR", mode = "list")){
+if(exists("my_tree")){
   myphseq <- phyloseq(tax_table(taxtab), sample_data(samdf_2),
                       otu_table(seqtab_t, taxa_are_rows = TRUE),
-                      phy_tree(fitGTR$tree))
+                      phy_tree(my_tree))
 } else {
   myphseq <- phyloseq(tax_table(taxtab), sample_data(samdf_2),
                       otu_table(seqtab_t, taxa_are_rows = TRUE))}
@@ -703,7 +716,7 @@ seqtab2 <- dplyr::full_join(select(taxtab2, ASV, s_label), seqtab2) %>%
 seqtab_l <- pivot_longer(seqtab2, cols = 2:ncol(seqtab2), names_to = "variable")
 
 # adds a genus label and the full taxonomy
-seqtab_lg <- dplyr::full_join(seqtab_l, unique_tax) %>% 
+seqtab_lg <- dplyr::lectl_join(seqtab_l, unique_tax, multiple = "first") %>% 
   mutate(g_label = ifelse(Genus == "", s_label, Genus)) 
 
 #the edge table
